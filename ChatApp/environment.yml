@@ -9,3 +9,4 @@ dependencies:
   - flask
   - sqlite
   - ujson
+  - bcrypt
