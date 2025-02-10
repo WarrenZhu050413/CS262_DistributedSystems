@@ -218,7 +218,16 @@ handle_login():
 
 ```
 
+## 10-02-2025 Improve Security
+Realized that the security certificate was pushed to Github. Regenerated the certificate and put the `./security` folder into `.gitignore`.
 
+## 10-02-2025 Implement Separation of Concerns in the client code
+
+Refactor the client code to separate out the GUI code from the wire protocol code. Implemented the class ChatClient for the wire protocol code. Then implemented the class ChatClientApp (child class of ChatClient) for the GUI code.
+
+## 10-02-2025 Implement type annotations
+
+As the code grows, it is becoming more and more difficult to reason about the code. Therefore, implement type annotations to help with the code maintenance.
 
 ### Wire Protocol
 1. Different types of messages that we need to support

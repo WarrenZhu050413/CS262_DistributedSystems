@@ -654,3 +654,7 @@
 2025-02-10 12:53:21,870 [DEBUG] __main__ - Selector event: SelectorKey(fileobj=<ssl.SSLSocket fd=6, family=2, type=1, proto=0, laddr=('127.0.0.1', 54400), raddr=('127.0.0.1', 62076)>, fd=6, events=3, data=namespace(addr=('127.0.0.1', 62076), inb=b'', outb=b'', handshake_complete=True)), mask=1
 2025-02-10 12:53:21,870 [DEBUG] __main__ - Closing connection to ('127.0.0.1', 62076)
 2025-02-10 12:53:25,387 [INFO] __main__ - Caught keyboard interrupt, exiting
+2025-02-10 18:32:56,124 [INFO] __main__ - Starting the server...
+2025-02-10 18:32:56,127 [DEBUG] __main__ - About to call setup_database()
+2025-02-10 18:32:56,127 [DEBUG] __main__ - Setting up database...
+2025-02-10 18:32:56,145 [DEBUG] __main__ - Listening on 127.0.0.1:54400
