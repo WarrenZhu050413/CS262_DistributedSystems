@@ -9,7 +9,7 @@ import tkinter as tk
 import socket
 import json
 import ssl
-from config import HOST, PORT
+from modules.config import HOST, PORT
 
 
 class ChatClientApp:

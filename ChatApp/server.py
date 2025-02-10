@@ -11,7 +11,7 @@ import secrets
 import ssl
 import logging
 
-from config import HOST, PORT, DB_FILE
+from modules.config import HOST, PORT, DB_FILE
 
 class ChatServer:
     """
