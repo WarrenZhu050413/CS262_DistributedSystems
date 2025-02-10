@@ -297,7 +297,7 @@ def main():
     setup_database()
 
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain(certfile="server.crt", keyfile="server.key")
+    context.load_cert_chain(certfile="security/server.crt", keyfile="security/server.key")
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as lsock:
         lsock.bind((HOST, PORT))
         lsock.listen()
