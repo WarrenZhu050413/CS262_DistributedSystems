@@ -46,7 +46,7 @@ class ChatServer:
         """
         Configure logging settings.
         """
-        logging_level = logging.DEBUG # Can also be INFO in production
+        logging_level = logging.DEBUG  # Can also be INFO in production
         logging_file = self.log_file
         logging_format = "%(asctime)s - %(levelname)s - %(message)s"
 
@@ -128,7 +128,6 @@ class ChatServer:
         if mask & selectors.EVENT_WRITE:
             self._handle_write(tls_conn, data)
 
-
     def _complete_handshake(self, tls_conn: socket.socket, data) -> bool:
         """
         Try to complete the TLS handshake.
@@ -145,7 +144,6 @@ class ChatServer:
         except (OSError, ssl.SSLError) as e:
             self._close_connection(tls_conn, data, f"TLS handshake failed: {e}")
             return False
-
 
     def _handle_read(self, tls_conn: socket.socket, data, key) -> None:
         """
@@ -172,16 +170,14 @@ class ChatServer:
         # Process all complete (length-prefixed) messages in the input buffer.
         while True:
             if len(data.inb) < 4:
-                # Not enough data for the length prefix.
                 break
 
             msg_len = int.from_bytes(data.inb[:4], "big")
             if len(data.inb) < 4 + msg_len:
-                # Full message not yet received.
                 break
 
             raw_msg = data.inb[4:4+msg_len]
-            data.inb = data.inb[4+msg_len:]  # Remove the processed message.
+            data.inb = data.inb[4+msg_len:]
 
             try:
                 request_obj = WireMessageJSON.parse_wire_message(raw_msg)
@@ -190,12 +186,9 @@ class ChatServer:
                 self.queue_json_message(data, error_response)
                 continue
 
-            # Dispatch the request (this method returns a response dict).
             response_obj = self.handle_json_request(request_obj, key)
-            # Use WireMessageJSON to encode the response.
             response_bytes = WireMessageJSON.encode_message(response_obj)
             data.outb += response_bytes
-
 
     def _handle_write(self, tls_conn: socket.socket, data) -> None:
         """
@@ -210,7 +203,6 @@ class ChatServer:
             except ssl.SSLError as e:
                 self._close_connection(tls_conn, data, f"TLS write error: {e}")
 
-
     def _close_connection(self, tls_conn: socket.socket, data, error_message: str) -> None:
         """
         Log an error message, unregister the socket, remove any persistent listener,
@@ -223,61 +215,59 @@ class ChatServer:
         self.sel.unregister(tls_conn)
         tls_conn.close()
 
+    # NEW: Define queue_json_message method.
+    def queue_json_message(self, data, response_obj) -> None:
+        """
+        Encode the response object and append it to the connection's outgoing buffer.
+        """
+        response_bytes = WireMessageJSON.encode_message(response_obj)
+        data.outb += response_bytes
+
     def handle_json_request(self, req, key):
-        """
-        Dispatch JSON request based on the 'action' field.
-        """
         action = req.get("action", "").lower()
         if action == "register":
-            username = req.get("from_user", "")   # Use "from_user"
+            username = req.get("from_user", "")
             password = req.get("password", "")
             return self.handle_register(username, password)
 
         elif action == "login":
-            username = req.get("from_user", "")   # Use "from_user"
+            username = req.get("from_user", "")
             password = req.get("password", "")
             return self.handle_login(username, password)
 
         elif action == "message":
             session_id = req.get("session_id")
-            from_user = req.get("from_user", "")  # 
-            to_user = req.get("to_user", "")      # now use "to_user"
-            message = req.get("message", "") # now use "message"
+            from_user = req.get("from_user", "")
+            to_user = req.get("to_user", "")
+            message = req.get("message", "")
             return self.handle_message(session_id, from_user, to_user, message)
 
-        # NEW: Handle listing of accounts
         elif action == "list_accounts":
             session_id = req.get("session_id")
-            pattern = req.get("message", "")  # Using 'message' field for the pattern
+            pattern = req.get("message", "")
             return self.handle_list_accounts(session_id, pattern)
 
-        # NEW: Handle reading undelivered messages
         elif action == "read_messages":
             session_id = req.get("session_id")
-            from_user = req.get("from_user", "")   # Use "from_user" for consistency
+            from_user = req.get("from_user", "")
             count_str = req.get("message", "")
             return self.handle_read_messages(session_id, from_user, count_str)
 
-        # NEW: Handle persistent listener connection for real-time messages
         elif action == "listen":
-            username = req.get("from_user", "")  # req.get("from_user", "")
+            username = req.get("from_user", "")
             session_id = req.get("session_id")
             if not session_id or session_id not in self.active_sessions or self.active_sessions[session_id] != username:
                 result = {"status": "error", "error": "Invalid session for listening"}
                 self.logger.info("Returning from handle_json_request (listen): %s", result)
                 return result
-            # Record this connection as the listener for the given username.
-            key.data.username = username  # attach the username to the connection data
+            key.data.username = username
             self.listeners[username] = key.data
             result = {"status": "ok", "message": "Listening for real-time messages"}
             self.logger.info("Returning from handle_json_request (listen): %s", result)
             return result
 
         else:
-            result = {
-                "status": "error",
-                "error": f"Unknown action: {action}"
-            }
+            result = {"status": "error", "error": f"Unknown action: {action}"}
             self.logger.info("Returning from handle_json_request (unknown action): %s", result)
             return result
 
@@ -293,66 +283,41 @@ class ChatServer:
         return [row[0] for row in rows]
 
     def handle_register(self, username, password):
-        """
-        Handle the 'register' action by creating a new user in the database.
-        """
-        # 1) Check password length
         if len(password) >= 256:
-            result = {
-                "status": "error",
-                "error": "Password is too long"
-            }
+            result = {"status": "error", "error": "Password is too long"}
             self.logger.info("Returning from handle_register: %s", result)
             return result
 
-        # 2) Check if username already exists
         conn = sqlite3.connect(self.db_file)
         c = conn.cursor()
         c.execute("SELECT username FROM users WHERE username = ?", (username,))
         row = c.fetchone()
-        self.logger.debug(f"The total list of usernames in the database prior to registration is: {self.get_all_usernames()}")
-        self.logger.debug(f"The username being registered is: {username}")
+        self.logger.debug(f"Usernames before registration: {self.get_all_usernames()}")
+        self.logger.debug(f"Registering username: {username}")
 
         if row is not None:
             conn.close()
-            result = {
-                "status": "error",
-                "error": "Username already exists"
-            }
+            result = {"status": "error", "error": "Username already exists"}
             self.logger.info("Returning from handle_register: %s", result)
-            self.logger.info("The total list of usernames in the database is: %s", self.get_all_usernames())
+            self.logger.info("Usernames in DB: %s", self.get_all_usernames())
             return result
 
-        # 3) Hash the password
         hashed_pass = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-        # 4) Insert into DB
         try:
             c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_pass))
             conn.commit()
         except Exception as e:
             conn.close()
-            result = {
-                "status": "error",
-                "error": f"Database error: {str(e)}"
-            }
+            result = {"status": "error", "error": f"Database error: {str(e)}"}
             self.logger.info("Returning from handle_register: %s", result)
             return result
 
         conn.close()
-        result = {
-            "status": "ok",
-            "message": "Registration successful"
-        }
+        result = {"status": "ok", "message": "Registration successful"}
         self.logger.info("Returning from handle_register: %s", result)
         return result
 
     def handle_login(self, username, password):
-        """
-        Handle the 'login' action by verifying user credentials
-        and creating a new session.
-        """
-        # 1) Check if user exists
         conn = sqlite3.connect(self.db_file)
         c = conn.cursor()
         c.execute("SELECT password FROM users WHERE username = ?", (username,))
@@ -360,62 +325,36 @@ class ChatServer:
         conn.close()
 
         if not row:
-            result = {
-                "status": "error",
-                "error": "Invalid username or password"
-            }
+            result = {"status": "error", "error": "Invalid username or password"}
             self.logger.info("Returning from handle_login: %s", result)
             return result
 
         stored_hashed_pass = row[0]
-        # 2) Check the provided password against the stored hash
         if not bcrypt.checkpw(password.encode('utf-8'), stored_hashed_pass.encode('utf-8')):
-            result = {
-                "status": "error",
-                "error": "Invalid username or password"
-            }
+            result = {"status": "error", "error": "Invalid username or password"}
             self.logger.info("Returning from handle_login: %s", result)
             return result
 
-        # 3) If valid, create a session ID
         session_id = secrets.token_hex(16)
         self.active_sessions[session_id] = username
         self.logger.info(f"Created session ID: {session_id} for user: {username}")
 
-        result = {
-            "status": "ok",
-            "session_id": session_id
-        }
+        result = {"status": "ok", "session_id": session_id}
         self.logger.info("Returning from handle_login: %s", result)
         return result
 
     def handle_message(self, session_id, from_user, to_user, msg):
-        """
-        Handle the 'message' action by verifying the session and user,
-        then storing the message in the database (undelivered) and, if possible,
-        delivering it in real-time (and marking it as delivered). If real-time push fails
-        or the recipient is not online, the message remains for later fetching.
-        """
-        # 1) Check session
         if not session_id or session_id not in self.active_sessions:
             self.logger.error(f"Invalid session: {session_id} from user: {from_user}")
-            result = {
-                "status": "error",
-                "error": "Invalid session"
-            }
+            result = {"status": "error", "error": "Invalid session"}
             self.logger.info("Returning from handle_message: %s", result)
             return result
 
-        # 2) Confirm that from_user matches this session
         if from_user != self.active_sessions[session_id]:
-            result = {
-                "status": "error",
-                "error": "Session does not match 'from' user"
-            }
+            result = {"status": "error", "error": "Session does not match 'from' user"}
             self.logger.info("Returning from handle_message: %s", result)
             return result
         
-        # 3) Check if recipient exists
         conn = sqlite3.connect(self.db_file)
         c = conn.cursor()
         c.execute("SELECT username FROM users WHERE username = ?", (to_user,))
@@ -423,14 +362,10 @@ class ChatServer:
 
         if row is None:
             conn.close()
-            result = {
-                "status": "error",
-                "error": "Recipient does not exist"
-            }
+            result = {"status": "error", "error": "Recipient does not exist"}
             self.logger.info("Returning from handle_message: %s", result)
             return result
 
-        # --- NEW: Always store the message in the database first (undelivered) ---
         try:
             c.execute("""
                 INSERT INTO messages (from_user, to_user, content, delivered) 
@@ -440,76 +375,43 @@ class ChatServer:
             conn.commit()
         except Exception as e:
             conn.close()
-            result = {
-                "status": "error",
-                "error": f"Database error: {str(e)}"
-            }
+            result = {"status": "error", "error": f"Database error: {str(e)}"}
             self.logger.info("Returning from handle_message: %s", result)
             return result
 
-        # --- REAL-TIME MOD: If recipient is online, attempt to push the message ---
         if to_user in self.listeners:
             listener_data = self.listeners[to_user]
             try:
                 push_obj = {"status": "ok", "from_user": from_user, "message": msg}
                 self.queue_json_message(listener_data, push_obj)
-                # If push succeeds, mark this message as delivered in the database.
                 c.execute("UPDATE messages SET delivered=1 WHERE id=?", (message_id,))
                 conn.commit()
                 conn.close()
-                result = {
-                    "status": "ok",
-                    "message": f"Message delivered to {to_user} in real-time"
-                }
+                result = {"status": "ok", "message": f"Message delivered to {to_user} in real-time"}
                 self.logger.info("Returning from handle_message: %s", result)
                 return result
             except Exception as e:
                 self.logger.error(f"Real-time delivery failed: {str(e)}")
-                # If the push fails, leave the message undelivered for later retrieval.
                 conn.close()
-                result = {
-                    "status": "ok",
-                    "message": f"Message stored for delivery to {to_user}"
-                }
+                result = {"status": "ok", "message": f"Message stored for delivery to {to_user}"}
                 self.logger.info("Returning from handle_message: %s", result)
                 return result
         else:
             conn.close()
-            result = {
-                "status": "ok",
-                "message": f"Message stored for delivery to {to_user}"
-            }
+            result = {"status": "ok", "message": f"Message stored for delivery to {to_user}"}
             self.logger.info("Returning from handle_message: %s", result)
             return result
 
-    # ===============================
-    # NEW: Handle list_accounts action
-    # ===============================
     def handle_list_accounts(self, session_id, pattern):
-        """
-        Handle the 'list_accounts' action by verifying session,
-        then returning a list of usernames matching the given pattern.
-        The client can do wildcard matching; for example, 'a%' 
-        to get all users starting with 'a'.
-        """
-        # 1) Check session
         if not session_id or session_id not in self.active_sessions:
             self.logger.error(f"Invalid session for list_accounts: {session_id}")
-            result = {
-                "status": "error",
-                "error": "Invalid session"
-            }
+            result = {"status": "error", "error": "Invalid session"}
             self.logger.info("Returning from handle_list_accounts: %s", result)
             return result
 
-        # 2) For safety, ensure the pattern is not empty. If empty, list all.
         if not pattern.strip():
-            # If the client sends an empty pattern, let's treat it as '*' (match all)
             pattern = "%"
         else:
-            # Convert simple wildcard '*' to '%'
-            # (If your client already sends a proper SQL LIKE pattern, skip this.)
-            # e.g., if pattern='abc*', then pattern='abc%'
             if "*" in pattern:
                 pattern = pattern.replace("*", "%")
 
@@ -520,60 +422,34 @@ class ChatServer:
             rows = c.fetchall()
         except Exception as e:
             conn.close()
-            result = {
-                "status": "error",
-                "error": f"Database error: {str(e)}"
-            }
+            result = {"status": "error", "error": f"Database error: {str(e)}"}
             self.logger.info("Returning from handle_list_accounts: %s", result)
             return result
 
-        # Format rows into a list of usernames
         accounts = [r[0] for r in rows]
         conn.close()
 
-        result = {
-            "status": "ok",
-            "accounts": accounts
-        }
+        result = {"status": "ok", "accounts": accounts}
         self.logger.info("Returning from handle_list_accounts: %s", result)
         return result
 
-    # ===============================
-    # NEW: Handle read_messages action
-    # ===============================
     def handle_read_messages(self, session_id, from_user, count_str):
-        """
-        Handle the 'read_messages' action by verifying the session,
-        then returning up to 'count' undelivered messages where to_user=from_user.
-
-        'count_str' is the string representing how many messages to retrieve.
-        """
-        # 1) Validate session
         if not session_id or session_id not in self.active_sessions:
             self.logger.error(f"Invalid session for read_messages: {session_id}")
-            result = {
-                "status": "error",
-                "error": "Invalid session"
-            }
+            result = {"status": "error", "error": "Invalid session"}
             self.logger.info("Returning from handle_read_messages: %s", result)
             return result
 
-        # 2) Confirm that from_user matches this session
         if from_user != self.active_sessions[session_id]:
-            result = {
-                "status": "error",
-                "error": "Session does not match 'from' user"
-            }
+            result = {"status": "error", "error": "Session does not match 'from' user"}
             self.logger.info("Returning from handle_read_messages: %s", result)
             return result
 
-        # 3) Parse the count
         try:
             count = int(count_str)
         except ValueError:
-            count = 5  # default if the client gave something invalid
+            count = 5
 
-        # 4) Fetch up to 'count' undelivered messages addressed to this user
         conn = sqlite3.connect(self.db_file)
         c = conn.cursor()
         try:
@@ -585,11 +461,8 @@ class ChatServer:
                 LIMIT ?
             """, (from_user, count))
             rows = c.fetchall()
-
-            # Mark these messages as delivered
             msg_ids = [r[0] for r in rows]
             if msg_ids:
-                # We only update if there are messages
                 c.executemany(
                     "UPDATE messages SET delivered=1 WHERE id=?",
                     [(mid,) for mid in msg_ids]
@@ -597,54 +470,39 @@ class ChatServer:
             conn.commit()
         except Exception as e:
             conn.close()
-            result = {
-                "status": "error",
-                "error": f"Database error: {str(e)}"
-            }
+            result = {"status": "error", "error": f"Database error: {str(e)}"}
             self.logger.info("Returning from handle_read_messages: %s", result)
             return result
 
-        # Build a list of message objects
         messages_list = []
         for row in rows:
             _id, from_user_db, content = row
             messages_list.append({
-                "from_user": from_user_db,  # use "from_user"
+                "from_user": from_user_db,
                 "content": content
             })
 
-
         conn.close()
 
-        result = {
-            "status": "ok",
-            "messages": messages_list
-        }
+        result = {"status": "ok", "messages": messages_list}
         self.logger.info("Returning from handle_read_messages: %s", result)
         return result
 
     def start(self):
-        """
-        Start the server loop, accepting incoming connections and servicing them.
-        """
         self.setup_logging()
         self.logger.info("Starting the server...")
         self.logger.debug("About to call setup_database()")
-
         self.setup_database()
 
-        # Create SSL context
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.load_cert_chain(certfile=self.cert_file, keyfile=self.key_file)
 
-        # Create, bind, and listen on the socket
         self.running = True
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as lsock:
             lsock.bind((self.host, self.port))
             lsock.listen()
             self.logger.debug(f"Listening on {self.host}:{self.port}")
             lsock.setblocking(False)
-
             self.sel.register(lsock, selectors.EVENT_READ, data=None)
 
             try:
@@ -652,10 +510,8 @@ class ChatServer:
                     events = self.sel.select(timeout=None)
                     for key, mask in events:
                         if key.data is None:
-                            # New incoming connection
                             self.accept_wrapper(key.fileobj, context)
                         else:
-                            # Existing connection ready for I/O
                             self.service_connection(key, mask)
             except KeyboardInterrupt:
                 self.logger.info("Caught keyboard interrupt, exiting")
@@ -663,8 +519,5 @@ class ChatServer:
                 self.sel.close()
 
     def stop(self):
-        """
-        Stop the server gracefully.
-        """
         self.logger.info("Stopping the server...")
         self.running = False
