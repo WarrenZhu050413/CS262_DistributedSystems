@@ -4,7 +4,7 @@ import ssl
 from typing import Dict, Any, Optional
 
 class ChatClient:
-    def __init__(self, host: str, port: int, cafile: str = "./security/server.crt") -> None:
+    def __init__(self, host: str, port: int, cafile: str) -> None:
         self.host: str = host
         self.port: int = port
         self.session_id: Optional[str] = None  # Keep session state here if needed
