@@ -239,6 +239,48 @@ With most of the funamental architecture in place, we made our message delivery 
 4. Added multi-threading so that real-time messaging is enabled when both sender and recipient are online. Messages sent when the recipient is offline are stored to be fetched by the recipient when they log back in.
 5. Display messages sent by a user in addition to messages that they receive.
 
+## 11-02-2025 Login for only 1 user per connection
+
+Previous code allows one connection to login multiple times. Now we modify the code so that one connection can only login once.
+
+## 11-02-2025 Preparing to migrate away from JSON
+
+Goal: Make the wire protocol transparent to the developer, so that they can still design using the more human readable JSON format, but the data being transferred is in a custom binary format.
+
+We refactored the code more so that the wire protocol is separated from the GUI and client code.
+
+Refactor the code to use a new WireMessage class that supports the following API:
+
+Input: action, from_user, to_user, password, msg
+
+Functions: WireMessage.make_wire_message(action, from_user, to_user, password, msg) -> wire_message: bytes
+           WireMessage.parse_wire_message(wire_message) -> action, from_user, to_user, password, msg
+
+These two interfaces are defined in the WireMessage class. They are implemented as class methods, which gives an easy way to define the protocol version.
+
+
+
+
+
+JSON specific functions are:
+
+```server.py
+self.queue_json_message()
+self.handle_json_request()
+```
+
+```client.py
+self.make_json_wire_message()
+self.send_request()
+self._read_response()
+self._parse_response()
+```
+
+ChatClientApp.on_send_click() -> ChatClient.send_request() -> ChatClient._read_response() -> ChatClient._parse_response()
+
+Perhaps the most convenient way to create our custom wire protocol is to it in custom binary format, and then when receiving it, 
+
+
 ### Wire Protocol
 1. Different types of messages that we need to support
 

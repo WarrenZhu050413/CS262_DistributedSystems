@@ -4,75 +4,99 @@ import time
 import os
 import random
 import string
+import socket
 
 from modules.ChatClient import ChatClient
 from server import ChatServer
-from modules.config import HOST, PORT, DB_FILE, CERT_FILE, KEY_FILE, LOG_FILE
+from modules.config import HOST, DB_FILE, CERT_FILE, KEY_FILE, LOG_FILE
 
 class TestChatApp(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # Instead of using a fixed port from config, choose a free port for the tests.
+        # This prevents "Address already in use" errors when a previous test didn’t fully release the port.
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind((HOST, 0))
+            cls.port = s.getsockname()[1]
+        print(f"Using test port: {cls.port}")
+
+    def setUp(self):
         """
         Start the chat server in a background thread. 
-        This runs once before all tests.
+        This runs before each test.
         """
-        # Ensure no leftover DB from a previous test run
+        # Remove any leftover DB file from previous runs.
         if os.path.exists(DB_FILE):
             os.remove(DB_FILE)
 
-        cls.server = ChatServer(
+        self.server = ChatServer(
             host=HOST,
-            port=PORT,
+            port=self.__class__.port,
             db_file=DB_FILE,
             cert_file=CERT_FILE,
             key_file=KEY_FILE,
             log_file=LOG_FILE
         )
         
-        # Start server in a separate thread
-        cls.server_thread = threading.Thread(target=cls.server.start, daemon=True)
-        cls.server_thread.start()
+        # Start the server in a background thread.
+        self.server_thread = threading.Thread(target=self.server.start, daemon=True)
+        self.server_thread.start()
 
-        # Give the server a moment to set up
-        time.sleep(1)
+        # Wait a bit to let the server initialize.
+        time.sleep(1.5)
 
-    @classmethod
-    def tearDownClass(cls):
+    def tearDown(self):
         """
-        Clean up after all tests have run.
+        Clean up after each test.
         """
-        # Stop the server gracefully
-        cls.server.stop()
-        cls.server_thread.join(timeout=5)
-        
-        # Clean up the test DB
+        # Stop the server gracefully.
+        try:
+            self.server.stop()
+        except Exception as e:
+            print(f"Error stopping server: {e}")
+
+        # Wait for the server thread to finish.
+        self.server_thread.join(timeout=5)
+        # Give the OS a little time to fully free the port.
+        time.sleep(0.5)
+
+        # Remove the DB file.
         if os.path.exists(DB_FILE):
-            os.remove(DB_FILE)
+            try:
+                os.remove(DB_FILE)
+            except Exception as e:
+                print(f"Error removing DB file: {e}")
 
     def test_register_login_message(self):
         """
-        End-to-end test that verifies:
+        End-to-end test verifying that:
           1. A user can register
           2. The same user can login
-          3. The user can send a message once logged in
+          3. The user can send a message after login
         """
-        client = ChatClient(HOST, PORT, cafile=CERT_FILE)
+        client = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
 
-        # Generate a random username to avoid collisions
+        # Use random usernames for both sender and recipient.
         test_username = "testuser_" + "".join(random.choices(string.ascii_lowercase, k=6))
         test_password = "testpass"
+        test_recipient = "testuser_" + "".join(random.choices(string.ascii_lowercase, k=6))
+        test_message = "Hello, World!"
         
-        # 1) Register
-        resp = client.send_request(
-            action="register",
-            from_user=test_username,
-            to_user="",
-            password=test_password,
-            msg=""
-        )
-        self.assertEqual(resp.get("status"), "ok", f"Registration failed: {resp}")
+        # 1) Register both users.
+        for user in [test_username, test_recipient]:
+            resp = client.send_request(
+                action="register",
+                from_user=user,
+                to_user="",
+                password=test_password,
+                msg=""
+            )
+            self.assertEqual(
+                resp.get("status"), "ok",
+                f"Registration failed for {user}: {resp}"
+            )
 
-        # 2) Login
+        # 2) Login with the first user.
         resp = client.send_request(
             action="login",
             from_user=test_username,
@@ -83,29 +107,65 @@ class TestChatApp(unittest.TestCase):
         self.assertEqual(resp.get("status"), "ok", f"Login failed: {resp}")
         self.assertIn("session_id", resp, "No session_id returned on login")
 
-        # 3) Send a message
-        message_text = "Hello, World!"
+        # 3) Send a message.
         resp = client.send_request(
             action="message",
             from_user=test_username,
-            to_user="anotheruser",  # Just an example; server prints it to console
-            password="",            # Not needed here once logged in
-            msg=message_text
+            to_user=test_recipient,
+            password="",
+            msg=test_message
         )
         self.assertEqual(resp.get("status"), "ok", f"Message send failed: {resp}")
-        self.assertIn("Message delivered", resp.get("message", ""), "Unexpected message response")
-
-        # Optional: Confirm that the client's stored session matches
+        self.assertIn("Message delivered", resp.get("message", ""),
+                      "Unexpected message response")
         self.assertIsNotNone(client.session_id, "Client did not store session_id")
+        print(f"Successfully sent message from {test_username} to {test_recipient}")
 
-    '''
-    Test error handling:
-    - Log in with nonexistent username (e.g. test if can login before registering a username)
-    - Try to create same username twice
-    - Login with incorrect password
-    - Send a message to a user that does not exist
-    '''
-        
+    def test_login_nonexistent_user(self):
+        """
+        Test that logging in with a username that isn’t registered returns an error.
+        """
+        client = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
+
+        # Use a random nonexistent username.
+        nonexistent_username = "nonexistent_" + "".join(random.choices(string.ascii_lowercase, k=6))
+        resp = client.send_request(
+            action="login",
+            from_user=nonexistent_username,
+            to_user="",
+            password="",
+            msg=""
+        )
+        self.assertEqual(resp.get("status"), "error",
+                         "Login should fail with nonexistent username")
+
+    def test_register_same_username(self):
+        """
+        Test that attempting to register the same username twice fails on the second attempt.
+        """
+        client = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
+        random_username = "testuser_" + "".join(random.choices(string.ascii_lowercase, k=6))
+        # First registration should succeed.
+        resp = client.send_request(
+            action="register",
+            from_user=random_username,
+            to_user="",
+            password="testpass",
+            msg=""
+        )
+        self.assertEqual(resp.get("status"), "ok", "First registration should succeed")
+        # Wait a brief moment to ensure the server processes the first request.
+        time.sleep(0.2)
+        # Second registration with the same username should fail.
+        resp = client.send_request(
+            action="register",
+            from_user=random_username,
+            to_user="",
+            password="testpass",
+            msg=""
+        )
+        self.assertEqual(resp.get("status"), "error",
+                         "Registration should fail when using the same username twice")
 
 if __name__ == "__main__":
     unittest.main()

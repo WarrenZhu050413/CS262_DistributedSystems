@@ -44,16 +44,15 @@ class ChatServer:
         """
         Configure logging settings.
         """
+        logging_level = logging.DEBUG # Can also be INFO in production
+        logging_file = self.log_file
+        logging_format = "%(asctime)s - %(levelname)s - %(message)s"
+
         logging.basicConfig(
-            level=logging.INFO,  # Only INFO-level and above messages will be logged.
-            filename=self.log_file,
-            format="%(asctime)s - %(levelname)s - %(message)s"
+            level=logging_level,
+            filename=logging_file,
+            format=logging_format
         )
-        # logging.basicConfig(
-        #     level=logging.DEBUG,  # or logging.INFO in production
-        #     filename=self.log_file,
-        #     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s"
-        # )
 
     def setup_database(self):
         """
@@ -137,6 +136,8 @@ class ChatServer:
 
         # Handle readable socket
         if mask & selectors.EVENT_READ:
+
+            # 1) Read the incoming data
             try:
                 recv_data = tls_conn.recv(4096)  # read up to 4KB
             except ssl.SSLWantReadError:
@@ -152,6 +153,7 @@ class ChatServer:
             except ConnectionResetError:
                 recv_data = None
 
+            # 2) Append the incoming data to the buffer
             if recv_data:
                 data.inb += recv_data
             else:
@@ -163,7 +165,7 @@ class ChatServer:
                 tls_conn.close()
                 return
 
-            # Process all complete (length-prefixed) messages in data.inb
+            # 3) Process all complete (length-prefixed) messages in data.inb
             while True:
                 if len(data.inb) < 4:
                     # Not enough bytes for length prefix
@@ -193,7 +195,10 @@ class ChatServer:
                 # Dispatch – pass the key so that persistent connections can be recorded.
                 response_obj = self.handle_json_request(request_obj, key)
                 # Send response
-                self.queue_json_message(data, response_obj)
+                json_str = json.dumps(response_obj)
+                encoded = json_str.encode("utf-8")
+                length_prefix = len(encoded).to_bytes(4, "big")  # 4-byte length
+                data.outb += length_prefix + encoded
 
         # Handle writable socket
         if mask & selectors.EVENT_WRITE:
@@ -212,35 +217,25 @@ class ChatServer:
                     tls_conn.close()
                     return
 
-    def queue_json_message(self, data, response_obj):
-        """
-        Encode the response_obj to JSON, prefix its length (4 bytes, big-endian),
-        then append to data.outb for sending.
-        """
-        json_str = json.dumps(response_obj)
-        encoded = json_str.encode("utf-8")
-        length_prefix = len(encoded).to_bytes(4, "big")  # 4-byte length
-        data.outb += length_prefix + encoded
-
     def handle_json_request(self, req, key):
         """
         Dispatch JSON request based on the 'action' field.
         """
         action = req.get("action", "").lower()
         if action == "register":
-            username = req.get("from", "")
+            username = req.get("from_user", "")
             password = req.get("password", "")
             return self.handle_register(username, password)
 
         elif action == "login":
-            username = req.get("from", "")
+            username = req.get("from_user", "")
             password = req.get("password", "")
             return self.handle_login(username, password)
 
         elif action == "message":
             session_id = req.get("session_id")
-            from_user = req.get("from", "")
-            to_user = req.get("to", "")
+            from_user = req.get("from_user", "")
+            to_user = req.get("to_user", "")
             message = req.get("message", "")
             return self.handle_message(session_id, from_user, to_user, message)
 
@@ -253,13 +248,13 @@ class ChatServer:
         # NEW: Handle reading undelivered messages
         elif action == "read_messages":
             session_id = req.get("session_id")
-            from_user = req.get("from", "")   # The user who is requesting messages
+            from_user = req.get("from_user", "")   # The user who is requesting messages
             count_str = req.get("message", "")  # We'll parse how many messages to fetch
             return self.handle_read_messages(session_id, from_user, count_str)
 
         # NEW: Handle persistent listener connection for real-time messages
         elif action == "listen":
-            username = req.get("from", "")
+            username = req.get("from_user", "")
             session_id = req.get("session_id")
             if not session_id or session_id not in self.active_sessions or self.active_sessions[session_id] != username:
                 result = {"status": "error", "error": "Invalid session for listening"}
@@ -280,6 +275,17 @@ class ChatServer:
             self.logger.info("Returning from handle_json_request (unknown action): %s", result)
             return result
 
+    def get_all_usernames(self):
+        """
+        Get all usernames from the database.
+        """
+        conn = sqlite3.connect(self.db_file)
+        c = conn.cursor()
+        c.execute("SELECT username FROM users")
+        rows = c.fetchall()
+        conn.close()
+        return [row[0] for row in rows]
+
     def handle_register(self, username, password):
         """
         Handle the 'register' action by creating a new user in the database.
@@ -298,6 +304,8 @@ class ChatServer:
         c = conn.cursor()
         c.execute("SELECT username FROM users WHERE username = ?", (username,))
         row = c.fetchone()
+        self.logger.debug(f"The total list of usernames in the database prior to registration is: {self.get_all_usernames()}")
+        self.logger.debug(f"The username being registered is: {username}")
 
         if row is not None:
             conn.close()
@@ -306,6 +314,7 @@ class ChatServer:
                 "error": "Username already exists"
             }
             self.logger.info("Returning from handle_register: %s", result)
+            self.logger.info("The total list of usernames in the database is: %s", self.get_all_usernames())
             return result
 
         # 3) Hash the password
@@ -436,7 +445,7 @@ class ChatServer:
         if to_user in self.listeners:
             listener_data = self.listeners[to_user]
             try:
-                push_obj = {"status": "ok", "from": from_user, "message": msg}
+                push_obj = {"status": "ok", "from_user": from_user, "message": msg}
                 self.queue_json_message(listener_data, push_obj)
                 # If push succeeds, mark this message as delivered in the database.
                 c.execute("UPDATE messages SET delivered=1 WHERE id=?", (message_id,))
@@ -594,7 +603,7 @@ class ChatServer:
         for row in rows:
             _id, from_user_db, content = row
             messages_list.append({
-                "from": from_user_db,
+                "from_user": from_user_db,
                 "content": content
             })
 
@@ -635,7 +644,6 @@ class ChatServer:
                 while self.running:
                     events = self.sel.select(timeout=None)
                     for key, mask in events:
-                        self.logger.debug(f"Selector event: {key}, mask={mask}")
                         if key.data is None:
                             # New incoming connection
                             self.accept_wrapper(key.fileobj, context)
