@@ -38,31 +38,43 @@ class ChatClientApp:
         """
         Create and pack all GUI elements: labels, text entries, and buttons.
         """
-        # === Existing fields ===
-        tk.Label(self.root, text="Action (login/register/message):").pack(pady=2, anchor='w')
-        tk.Entry(self.root, textvariable=self.action_var, width=50).pack(pady=2)
+        # ========= User Authentication Frame =========
+        auth_frame = tk.LabelFrame(self.root, text="User Authentication")
+        auth_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
-        tk.Label(self.root, text="From (username):").pack(pady=2, anchor='w')
-        tk.Entry(self.root, textvariable=self.from_var, width=50).pack(pady=2)
+        # Username and Password fields for login/register (using from_var and password_var)
+        tk.Label(auth_frame, text="Username:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        tk.Entry(auth_frame, textvariable=self.from_var, width=30).grid(row=0, column=1, padx=5, pady=5)
 
-        tk.Label(self.root, text="To (recipient username):").pack(pady=2, anchor='w')
-        tk.Entry(self.root, textvariable=self.to_var, width=50).pack(pady=2)
+        tk.Label(auth_frame, text="Password:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        tk.Entry(auth_frame, textvariable=self.password_var, show='*', width=30).grid(row=1, column=1, padx=5, pady=5)
 
-        tk.Label(self.root, text="Password (for register/login):").pack(pady=2, anchor='w')
-        tk.Entry(self.root, textvariable=self.password_var, show='*', width=50).pack(pady=2)
+        # Buttons for Login and Register actions
+        login_btn = tk.Button(auth_frame, text="Login", command=self.on_login_click)
+        login_btn.grid(row=2, column=0, padx=5, pady=5, sticky="e")
 
-        tk.Label(self.root, text="Message (for 'message' action):").pack(pady=2, anchor='w')
-        tk.Entry(self.root, textvariable=self.message_var, width=50).pack(pady=2)
+        register_btn = tk.Button(auth_frame, text="Register", command=self.on_register_click)
+        register_btn.grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
-        # Button to trigger send
-        send_btn = tk.Button(self.root, text="Send Request", command=self.on_send_click)
-        send_btn.pack(pady=5)
+        # ========= Messaging Frame =========
+        msg_frame = tk.LabelFrame(self.root, text="Send Message")
+        msg_frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+        # Recipient field (using to_var)
+        tk.Label(msg_frame, text="Recipient:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        tk.Entry(msg_frame, textvariable=self.to_var, width=30).grid(row=0, column=1, padx=5, pady=5)
+
+        # Message field (using message_var) with Send Message button right beside it
+        tk.Label(msg_frame, text="Message:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        tk.Entry(msg_frame, textvariable=self.message_var, width=30).grid(row=1, column=1, padx=5, pady=5)
+        send_msg_btn = tk.Button(msg_frame, text="Send Message", command=self.on_send_message_click)
+        send_msg_btn.grid(row=1, column=2, padx=5, pady=5)
 
         # Label to display the server's response
         self.response_label: tk.Label = tk.Label(self.root, text="", fg="blue", justify="left")
         self.response_label.pack(pady=10)
 
-        # === New frame for searching accounts ===
+        # ========= Existing frame for searching accounts =========
         search_frame = tk.LabelFrame(self.root, text="Search Accounts")
         search_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
@@ -84,7 +96,7 @@ class ChatClientApp:
         next_btn = tk.Button(nav_frame, text="Next", command=self.on_next_page)
         next_btn.pack(side="left", padx=10)
 
-        # === New frame for reading messages ===
+        # ========= Existing frame for reading messages =========
         messages_frame = tk.LabelFrame(self.root, text="Incoming Messages")
         messages_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
@@ -97,6 +109,27 @@ class ChatClientApp:
         # A Text widget to display incoming messages
         self.incoming_messages_text = tk.Text(messages_frame, width=60, height=10, state="disabled")
         self.incoming_messages_text.pack(fill="both", expand=True, padx=5, pady=5)
+
+    def on_login_click(self) -> None:
+        """
+        Set the action to 'login' and invoke the send click handler.
+        """
+        self.action_var.set("login")
+        self.on_send_click()
+
+    def on_register_click(self) -> None:
+        """
+        Set the action to 'register' and invoke the send click handler.
+        """
+        self.action_var.set("register")
+        self.on_send_click()
+
+    def on_send_message_click(self) -> None:
+        """
+        Set the action to 'message' and invoke the send click handler.
+        """
+        self.action_var.set("message")
+        self.on_send_click()
 
     def on_send_click(self) -> None:
         """
