@@ -6,9 +6,11 @@ PORT = 54400
 DB_FILE = "users.db"
 
 # Security configuration
-CERT_FILE = "security/server.crt"
-KEY_FILE = "security/server.key"
+CERT_FILE = "ChatApp/security/server.crt"
+KEY_FILE = "ChatApp/security/server.key"
 
 # Logging configuration
-LOG_FILE = "./logging/server.log"
+LOG_FILE = "ChatApp/logging/server.log"
 
+# Supported actions
+SUPPORTED_ACTIONS = ["register", "login", "message", "list_accounts", "read_messages", "listen"]

@@ -7,7 +7,9 @@ import bcrypt
 import secrets
 import ssl
 import logging
+
 from typing import Dict
+from .WireMessageJSON import WireMessageJSON
 
 class ChatServer:
     """
@@ -110,112 +112,116 @@ class ChatServer:
 
     def service_connection(self, key, mask):
         """
-        Service a client connection for read/write events.
+        Process I/O events on a TLS connection using non-blocking sockets.
+        Uses WireMessageJSON for decoding incoming messages and encoding responses.
         """
         tls_conn = key.fileobj
         data = key.data
 
-        # 1) If the handshake hasn't completed, try to do it.
-        if not data.handshake_complete:
-            try:
-                tls_conn.do_handshake()
-                data.handshake_complete = True  # success!
-                self.logger.debug(f"Handshake complete for {data.addr}")
-            except (ssl.SSLWantReadError, ssl.SSLWantWriteError):
-                # We need more reads/writes; return and wait for next event
-                return
-            except (OSError, ssl.SSLError) as e:
-                # Remove persistent listener if set
-                if hasattr(data, 'username'):
-                    if data.username in self.listeners and self.listeners[data.username] is data:
-                        del self.listeners[data.username]
-                self.logger.error("TLS handshake failed: %s", e)
-                self.sel.unregister(tls_conn)
-                tls_conn.close()
-                return
+        # Complete the TLS handshake if needed.
+        if not data.handshake_complete and not self._complete_handshake(tls_conn, data):
+            return
 
-        # Handle readable socket
         if mask & selectors.EVENT_READ:
+            self._handle_read(tls_conn, data, key)
 
-            # 1) Read the incoming data
+        if mask & selectors.EVENT_WRITE:
+            self._handle_write(tls_conn, data)
+
+
+    def _complete_handshake(self, tls_conn: socket.socket, data) -> bool:
+        """
+        Try to complete the TLS handshake.
+        Returns True if successful, or False if more I/O is needed.
+        """
+        try:
+            tls_conn.do_handshake()
+            data.handshake_complete = True
+            self.logger.debug(f"Handshake complete for {data.addr}")
+            return True
+        except (ssl.SSLWantReadError, ssl.SSLWantWriteError):
+            # Handshake is still in progress.
+            return False
+        except (OSError, ssl.SSLError) as e:
+            self._close_connection(tls_conn, data, f"TLS handshake failed: {e}")
+            return False
+
+
+    def _handle_read(self, tls_conn: socket.socket, data, key) -> None:
+        """
+        Read available data from the socket, extract complete messages using
+        WireMessageJSON.parse_wire_message(), dispatch the request, and queue
+        the encoded response for sending.
+        """
+        try:
+            recv_data = tls_conn.recv(4096)  # Read up to 4KB
+        except ssl.SSLWantReadError:
+            return
+        except ssl.SSLError as e:
+            self._close_connection(tls_conn, data, f"TLS read error: {e}")
+            return
+        except ConnectionResetError:
+            recv_data = None
+
+        if recv_data:
+            data.inb += recv_data
+        else:
+            self._close_connection(tls_conn, data, f"Closing connection to {data.addr}")
+            return
+
+        # Process all complete (length-prefixed) messages in the input buffer.
+        while True:
+            if len(data.inb) < 4:
+                # Not enough data for the length prefix.
+                break
+
+            msg_len = int.from_bytes(data.inb[:4], "big")
+            if len(data.inb) < 4 + msg_len:
+                # Full message not yet received.
+                break
+
+            raw_msg = data.inb[4:4+msg_len]
+            data.inb = data.inb[4+msg_len:]  # Remove the processed message.
+
             try:
-                recv_data = tls_conn.recv(4096)  # read up to 4KB
-            except ssl.SSLWantReadError:
+                request_obj = WireMessageJSON.parse_wire_message(raw_msg)
+            except json.JSONDecodeError as e:
+                error_response = {"status": "error", "error": f"JSON parse error: {e}"}
+                self.queue_json_message(data, error_response)
+                continue
+
+            # Dispatch the request (this method returns a response dict).
+            response_obj = self.handle_json_request(request_obj, key)
+            # Use WireMessageJSON to encode the response.
+            response_bytes = WireMessageJSON.encode_message(response_obj)
+            data.outb += response_bytes
+
+
+    def _handle_write(self, tls_conn: socket.socket, data) -> None:
+        """
+        Write queued outgoing data to the socket.
+        """
+        if data.outb:
+            try:
+                sent = tls_conn.send(data.outb)
+                data.outb = data.outb[sent:]
+            except ssl.SSLWantWriteError:
                 return
             except ssl.SSLError as e:
-                if hasattr(data, 'username'):
-                    if data.username in self.listeners and self.listeners[data.username] is data:
-                        del self.listeners[data.username]
-                self.logger.error("TLS read error: %s", e)
-                self.sel.unregister(tls_conn)
-                tls_conn.close()
-                return
-            except ConnectionResetError:
-                recv_data = None
+                self._close_connection(tls_conn, data, f"TLS write error: {e}")
 
-            # 2) Append the incoming data to the buffer
-            if recv_data:
-                data.inb += recv_data
-            else:
-                self.logger.debug(f"Closing connection to {data.addr}")
-                if hasattr(data, 'username'):
-                    if data.username in self.listeners and self.listeners[data.username] is data:
-                        del self.listeners[data.username]
-                self.sel.unregister(tls_conn)
-                tls_conn.close()
-                return
 
-            # 3) Process all complete (length-prefixed) messages in data.inb
-            while True:
-                if len(data.inb) < 4:
-                    # Not enough bytes for length prefix
-                    break
-
-                # Parse the next length (4 bytes, big-endian)
-                msg_len = int.from_bytes(data.inb[:4], "big")
-                if len(data.inb) < 4 + msg_len:
-                    # We don't have the full message yet
-                    break
-
-                # Extract the message
-                raw_msg = data.inb[4 : 4 + msg_len]
-                data.inb = data.inb[4 + msg_len :]  # remove processed bytes
-
-                # Decode/parse JSON
-                try:
-                    request_obj = json.loads(raw_msg.decode("utf-8"))
-                except json.JSONDecodeError as e:
-                    response_obj = {
-                        "status": "error",
-                        "error": f"JSON parse error: {str(e)}"
-                    }
-                    self.queue_json_message(data, response_obj)
-                    continue
-
-                # Dispatch – pass the key so that persistent connections can be recorded.
-                response_obj = self.handle_json_request(request_obj, key)
-                # Send response
-                json_str = json.dumps(response_obj)
-                encoded = json_str.encode("utf-8")
-                length_prefix = len(encoded).to_bytes(4, "big")  # 4-byte length
-                data.outb += length_prefix + encoded
-
-        # Handle writable socket
-        if mask & selectors.EVENT_WRITE:
-            if data.outb:
-                try:
-                    sent = tls_conn.send(data.outb)
-                    data.outb = data.outb[sent:]
-                except ssl.SSLWantWriteError:
-                    return
-                except ssl.SSLError as e:
-                    if hasattr(data, 'username'):
-                        if data.username in self.listeners and self.listeners[data.username] is data:
-                            del self.listeners[data.username]
-                    self.logger.error("TLS write error: %s", e)
-                    self.sel.unregister(tls_conn)
-                    tls_conn.close()
-                    return
+    def _close_connection(self, tls_conn: socket.socket, data, error_message: str) -> None:
+        """
+        Log an error message, unregister the socket, remove any persistent listener,
+        and close the connection.
+        """
+        if hasattr(data, 'username'):
+            if data.username in self.listeners and self.listeners[data.username] is data:
+                del self.listeners[data.username]
+        self.logger.error(error_message)
+        self.sel.unregister(tls_conn)
+        tls_conn.close()
 
     def handle_json_request(self, req, key):
         """

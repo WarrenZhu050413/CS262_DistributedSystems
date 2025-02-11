@@ -7,8 +7,17 @@ class WireMessageJSON(WireMessage):
     protocol_version: int = 1
 
     @classmethod
+    def encode_message(cls, message: dict) -> bytes:
+        """
+        Helper method to encode any JSON object as a length-prefixed message.
+        """
+        payload = json.dumps(message).encode("utf-8")
+        prefix = len(payload).to_bytes(4, "big")
+        return prefix + payload
+
+    @classmethod
     def make_wire_message(cls, action: str, from_user: str, to_user: str, password: str, msg: str, session_id: str) -> bytes:
-        payload = json.dumps({
+        message_json = {
             "protocol_version": cls.protocol_version,
             "action": action,
             "from_user": from_user,
@@ -16,10 +25,8 @@ class WireMessageJSON(WireMessage):
             "password": password,
             "msg": msg,
             "session_id": session_id
-        }).encode('utf-8')
-        # Prepend a 4-byte big-endian length prefix.
-        prefix = len(payload).to_bytes(4, 'big')
-        return prefix + payload
+        }
+        return cls.encode_message(message_json)
 
     @staticmethod
     def _recv_exactly(sock: socket.socket, n: int) -> Optional[bytes]:

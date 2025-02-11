@@ -251,16 +251,45 @@ We refactored the code more so that the wire protocol is separated from the GUI 
 
 Refactor the code to use a new WireMessage class that supports the following API:
 
-Input: action, from_user, to_user, password, msg
+Input: action, from_user, to_user, password, msg, session_id
 
-Functions: WireMessage.make_wire_message(action, from_user, to_user, password, msg) -> wire_message: bytes
-           WireMessage.parse_wire_message(wire_message) -> action, from_user, to_user, password, msg
+Functions: WireMessage.make_wire_message(action, from_user, to_user, password, msg, session_id) -> wire_message: bytes
+           WireMessage.parse_wire_message(wire_message) -> JSON object
+           WireMessage.read_wire_message(socket) -> wire_message: bytes
 
-These two interfaces are defined in the WireMessage class. They are implemented as class methods, which gives an easy way to define the protocol version.
+Note: Parse_wire and read_wire message are separated out. The read_wire message returns the bytes object, and the parse_wire message parses the bytes object into a JSON object.
 
+The client side code is rewritten using WireProtocolJSON, same with the server side code
 
+## 11-02-2025 Changing the import structure and config file to make it run like a package
 
+Now, every module import is relative to the ChatApp folder.
 
+```
+python -m ChatApp.server 
+python -m ChatApp.client
+```
+
+## 11-02-2025 Implementing More Unit Tests
+
+Implemented more unit tests to test the message delivery system.
+
+Found the following error:
+```
+======================================================================
+FAIL: test_read_messages (__main__.TestChatApp.test_read_messages)
+Test that reading messages returns undelivered messages and marks them as delivered.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/wz/Desktop/CS2620/CS2620_Code/CS262_DistributedSystems/ChatApp/testchat.py", line 306, in test_read_messages
+    self.assertEqual(sent_msg, msg_obj.get("content"), "Mismatch in message content")
+AssertionError: 'Hello' != ''
+- Hello
++ 
+ : Mismatch in message content
+```
+
+Hypothesis: Message is not being stored in the database.
 
 JSON specific functions are:
 
