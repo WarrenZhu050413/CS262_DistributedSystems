@@ -152,6 +152,9 @@ class ChatClientApp:
                 action, from_user, to_user, password, msg
             )
             self.response_label.config(text=f"Server responded with JSON:\n{resp_json}")
+            # REAL-TIME MOD: After a successful login, start the persistent listener.
+            if action == "login" and "session_id" in resp_json:
+                self.client.start_listener(from_user, self.handle_incoming_message)
         except ConnectionRefusedError:
             self.response_label.config(text="Could not connect to server. Is it running?")
         except Exception as e:
@@ -281,3 +284,20 @@ class ChatClientApp:
         self.incoming_messages_text.insert(tk.END, text)
         self.incoming_messages_text.config(state="disabled")
         self.incoming_messages_text.see(tk.END)  # auto-scroll
+
+    # ------------------------------
+    # NEW: Method to handle real-time incoming messages
+    # ------------------------------
+    def handle_incoming_message(self, msg_json: Dict[str, Any]) -> None:
+        """
+        Callback for messages arriving via the persistent listener connection.
+        Since this runs in a background thread, we use self.root.after to update the GUI.
+        """
+        def update_gui():
+            if msg_json.get("status") == "ok" and "message" in msg_json and "from" in msg_json:
+                self._append_incoming_messages(f"Real-time from {msg_json['from']}: {msg_json['message']}\n")
+            elif msg_json.get("status") == "error":
+                self._append_incoming_messages(f"Real-time error: {msg_json.get('error')}\n")
+            else:
+                self._append_incoming_messages(f"Real-time: {msg_json}\n")
+        self.root.after(0, update_gui)

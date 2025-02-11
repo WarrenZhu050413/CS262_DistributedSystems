@@ -1,6 +1,7 @@
 import socket
 import json
 import ssl
+import threading  # REAL-TIME MOD: Needed for the listener thread
 from typing import Dict, Any, Optional
 
 class ChatClient:
@@ -20,9 +21,8 @@ class ChatClient:
         Build a JSON dictionary with the specified parameters.
         Returns a Python dictionary.
         
-        'action' can be "register", "login", "message", "list_accounts", or "read_messages".
-        'msg' is reused for various purposes (e.g. the text pattern for list_accounts,
-        the number of messages to fetch for read_messages, etc.).
+        'action' can be "register", "login", "message", "list_accounts", "read_messages", or "listen".
+        'msg' is reused for various purposes.
         """
         return {
             "action": action,
@@ -37,12 +37,6 @@ class ChatClient:
         """
         Build the request, send it over the socket, receive the response.
         Return the parsed JSON response.
-
-        Example usage for listing accounts:
-            send_request("list_accounts", my_user, "", "", "A%")
-
-        Example usage for reading messages (fetch 5 messages):
-            send_request("read_messages", my_user, "", "", "5")
         """
         request_obj: Dict[str, Any] = self.build_message(action, from_user, to_user, password, msg)
         wire_message: str = json.dumps(request_obj)
@@ -87,3 +81,47 @@ class ChatClient:
                 return None  # Connection closed
             buf += chunk
         return buf
+
+    # ------------------------------
+    # NEW: Persistent listener for real-time messages
+    # ------------------------------
+    def start_listener(self, from_user: str, callback) -> None:
+        """
+        Establish a persistent connection to the server and send a 'listen' request.
+        Then, in a background thread, continuously read pushed messages and invoke the callback.
+        """
+        def listen_thread():
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
+                    raw_socket.connect((self.host, self.port))
+                    with self.context.wrap_socket(raw_socket, server_side=False, server_hostname=self.host) as s:
+                        # Build and send the listen request
+                        listen_req = self.build_message("listen", from_user, "", "", "")
+                        wire_message = json.dumps(listen_req)
+                        msg_bytes = wire_message.encode('utf-8')
+                        prefix = len(msg_bytes).to_bytes(4, 'big')
+                        s.sendall(prefix + msg_bytes)
+                        # Optionally, read the server's acknowledgement
+                        length_data = self._recv_exactly(s, 4)
+                        if not length_data:
+                            return
+                        resp_length = int.from_bytes(length_data, 'big')
+                        _ = self._recv_exactly(s, resp_length)  # discard or log acknowledgement
+
+                        # Now keep reading pushed messages indefinitely
+                        while True:
+                            length_data = self._recv_exactly(s, 4)
+                            if not length_data:
+                                break
+                            msg_length = int.from_bytes(length_data, 'big')
+                            msg_data = self._recv_exactly(s, msg_length)
+                            if not msg_data:
+                                break
+                            msg_json = json.loads(msg_data.decode('utf-8'))
+                            callback(msg_json)
+            except Exception as e:
+                # Optionally, pass the error to the callback
+                callback({"status": "error", "error": str(e)})
+
+        t = threading.Thread(target=listen_thread, daemon=True)
+        t.start()

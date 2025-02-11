@@ -19,6 +19,7 @@ class ChatServer:
         """
         Initialize the chat server with required configuration.
         """
+
         self.host: str = host
         self.port: int = port
         self.db_file: str = db_file
@@ -27,6 +28,8 @@ class ChatServer:
         
         # In-memory session storage: session_id -> username
         self.active_sessions: Dict[str, str] = {}
+        # REAL-TIME MOD: Dictionary mapping usernames to their persistent listener connection data
+        self.listeners: Dict[str, any] = {}
 
         # Selector for handling concurrent I/O
         self.sel: selectors.DefaultSelector = selectors.DefaultSelector()
@@ -106,6 +109,7 @@ class ChatServer:
         """
         Service a client connection for read/write events.
         """
+
         tls_conn = key.fileobj
         data = key.data
 
@@ -174,8 +178,8 @@ class ChatServer:
                     self.queue_json_message(data, response_obj)
                     continue
 
-                # Dispatch
-                response_obj = self.handle_json_request(request_obj)
+                # Dispatch – pass the key so that persistent connections can be recorded.
+                response_obj = self.handle_json_request(request_obj, key)
                 # Send response
                 self.queue_json_message(data, response_obj)
 
@@ -203,7 +207,7 @@ class ChatServer:
         length_prefix = len(encoded).to_bytes(4, "big")  # 4-byte length
         data.outb += length_prefix + encoded
 
-    def handle_json_request(self, req):
+    def handle_json_request(self, req, key):
         """
         Dispatch JSON request based on the 'action' field.
         """
@@ -237,6 +241,17 @@ class ChatServer:
             from_user = req.get("from", "")   # The user who is requesting messages
             count_str = req.get("message", "")  # We'll parse how many messages to fetch
             return self.handle_read_messages(session_id, from_user, count_str)
+
+        # NEW: Handle persistent listener connection for real-time messages
+        elif action == "listen":
+            username = req.get("from", "")
+            session_id = req.get("session_id")
+            if not session_id or session_id not in self.active_sessions or self.active_sessions[session_id] != username:
+                return {"status": "error", "error": "Invalid session for listening"}
+            # Record this connection as the listener for the given username.
+            key.data.username = username  # attach the username to the connection data
+            self.listeners[username] = key.data
+            return {"status": "ok", "message": "Listening for real-time messages"}
 
         else:
             return {
@@ -328,7 +343,7 @@ class ChatServer:
     def handle_message(self, session_id, from_user, to_user, msg):
         """
         Handle the 'message' action by verifying the session and user,
-        then storing the message in the database (undelivered).
+        then storing the message in the database (undelivered) or delivering in real-time.
         """
         # 1) Check session
         if not session_id or session_id not in self.active_sessions:
@@ -357,6 +372,21 @@ class ChatServer:
                 "status": "error",
                 "error": "Recipient does not exist"
             }
+
+        # REAL-TIME MOD: If recipient is online, try to push the message immediately.
+        if to_user in self.listeners:
+            listener_data = self.listeners[to_user]
+            try:
+                push_obj = {"status": "ok", "from": from_user, "message": msg}
+                self.queue_json_message(listener_data, push_obj)
+                conn.close()
+                return {
+                    "status": "ok",
+                    "message": f"Message delivered to {to_user} in real-time"
+                }
+            except Exception as e:
+                # If real-time push fails, fall back to storing in DB.
+                self.logger.error(f"Real-time delivery failed: {str(e)}")
 
         # 4) Store the message in the 'messages' table as undelivered
         try:
