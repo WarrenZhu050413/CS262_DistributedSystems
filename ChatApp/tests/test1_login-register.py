@@ -70,9 +70,14 @@ class TestChatApp(WireProtocolTest):
     def test_login_nonexistent_user(self):
         """
         Test that logging in with a username that isn’t registered returns an error.
+        This test ensures that the generated username does not exist in the database.
         """
         client = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
+        # Generate a random username and ensure it doesn't exist.
         nonexistent_username = "nonexistent_" + "".join(random.choices(string.ascii_lowercase, k=6))
+        while nonexistent_username in self.server.get_all_usernames():
+            nonexistent_username = "nonexistent_" + "".join(random.choices(string.ascii_lowercase, k=6))
+        
         resp = client.send_request(
             action="login",
             from_user=nonexistent_username,
@@ -81,7 +86,8 @@ class TestChatApp(WireProtocolTest):
             msg=""
         )
         self.assertEqual(resp.get("status"), "error",
-                         "Login should fail with nonexistent username")
+                        "Login should fail with nonexistent username")
+        print(f"Successfully prevented login from nonexistent user: {nonexistent_username}")
 
     def test_register_same_username(self):
         """
@@ -110,6 +116,37 @@ class TestChatApp(WireProtocolTest):
         )
         self.assertEqual(resp.get("status"), "error",
                          "Registration should fail when using the same username twice")
+        print(f"Successfully prevented duplicate registration of same username.")
+
+    def test_login_incorrect_password(self):
+        """
+        Test that logging in with the correct username but an incorrect password fails.
+        This verifies that authentication fails when the password does not match the one stored in the database.
+        """
+        client = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
+        test_username = "testuser_" + "".join(random.choices(string.ascii_lowercase, k=6))
+        correct_password = "correctpass"
+        wrong_password = "wrongpass"
+        # Register the user.
+        resp = client.send_request(
+            action="register",
+            from_user=test_username,
+            to_user="",
+            password=correct_password,
+            msg=""
+        )
+        self.assertEqual(resp.get("status"), "ok", f"Registration failed for {test_username}: {resp}")
+        # Attempt to login with the wrong password.
+        resp = client.send_request(
+            action="login",
+            from_user=test_username,
+            to_user="",
+            password=wrong_password,
+            msg=""
+        )
+        self.assertEqual(resp.get("status"), "error",
+                         "Login should fail with an incorrect password")
+        print(f"Successfully prevented login with an incorrect password.")
 
 if __name__ == "__main__":
     unittest.main()
