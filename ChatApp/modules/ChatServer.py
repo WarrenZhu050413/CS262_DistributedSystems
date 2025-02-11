@@ -1,4 +1,3 @@
-
 import json
 import socket
 import selectors
@@ -318,8 +317,21 @@ class ChatServer:
                 "status": "error",
                 "error": "Session does not match 'from' user"
             }
+        
+        # 3) Check if recipient exists
+        conn = sqlite3.connect(self.db_file)
+        c = conn.cursor()
+        c.execute("SELECT username FROM users WHERE username = ?", (to_user,))
+        row = c.fetchone()
 
-        # 3) "Send" the message (here, just print to server console)
+        if row is None:
+            conn.close()
+            return {
+                "status": "error",
+                "error": "Recipient does not exist"
+            }
+
+        # 4) "Send" the message (here, just print to server console)
         print(f"[MESSAGE] {from_user} -> {to_user}: {msg}")
 
         return {

@@ -97,6 +97,14 @@ class TestChatApp(unittest.TestCase):
 
         # Optional: Confirm that the client's stored session matches
         self.assertIsNotNone(client.session_id, "Client did not store session_id")
+
+    '''
+    Test error handling:
+    - Log in with nonexistent username (e.g. test if can login before registering a username)
+    - Try to create same username twice
+    - Login with incorrect password
+    - Send a message to a user that does not exist
+    '''
         
 
 if __name__ == "__main__":

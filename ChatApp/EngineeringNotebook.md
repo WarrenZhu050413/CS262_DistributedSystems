@@ -229,6 +229,12 @@ Refactor the client code to separate out the GUI code from the wire protocol cod
 
 As the code grows, it is becoming more and more difficult to reason about the code. Therefore, implement type annotations to help with the code maintenance.
 
+## 10-02-2025 Develop more robust message delivery system
+
+With most of the funamental architecture in place, we made our message delivery more robust with the following changes.
+
+1. Confirmed that the recipient username exists. If not, then we throw an appropriate error to notify the user.
+
 ### Wire Protocol
 1. Different types of messages that we need to support
 
