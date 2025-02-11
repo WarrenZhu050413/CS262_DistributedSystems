@@ -152,6 +152,11 @@ class ChatClientApp:
                 action, from_user, to_user, password, msg
             )
             self.response_label.config(text=f"Server responded with JSON:\n{resp_json}")
+            # If the action is "message", display the sent message in the message box.
+            if action == "message":
+                self._append_incoming_messages(f"To {to_user}: {msg}\n")
+                # Optionally, clear the message entry field after sending.
+                self.message_var.set("")
             # REAL-TIME MOD: After a successful login, start the persistent listener.
             if action == "login" and "session_id" in resp_json:
                 self.client.start_listener(from_user, self.handle_incoming_message)

@@ -19,7 +19,6 @@ class ChatServer:
         """
         Initialize the chat server with required configuration.
         """
-
         self.host: str = host
         self.port: int = port
         self.db_file: str = db_file
@@ -46,10 +45,15 @@ class ChatServer:
         Configure logging settings.
         """
         logging.basicConfig(
-            level=logging.DEBUG,  # or logging.INFO in production
+            level=logging.INFO,  # Only INFO-level and above messages will be logged.
             filename=self.log_file,
-            format="%(asctime)s [%(levelname)s] %(name)s - %(message)s"
+            format="%(asctime)s - %(levelname)s - %(message)s"
         )
+        # logging.basicConfig(
+        #     level=logging.DEBUG,  # or logging.INFO in production
+        #     filename=self.log_file,
+        #     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s"
+        # )
 
     def setup_database(self):
         """
@@ -59,7 +63,7 @@ class ChatServer:
         NOTE: We also create a 'messages' table for storing undelivered messages,
         and any other tables we need (for example, for listing accounts).
         """
-        self.logger.debug("Setting up database...")
+        self.logger.info("Setting up database...")
         conn = sqlite3.connect(self.db_file)
         c = conn.cursor()
         c.execute("""
@@ -87,7 +91,7 @@ class ChatServer:
         Accept an incoming connection and wrap it in SSL.
         """
         conn, addr = sock.accept()
-        self.logger.debug(f"Accepted connection from {addr}")
+        self.logger.info(f"Accepted connection from {addr}")
         try:
             tls_conn = context.wrap_socket(conn, server_side=True, do_handshake_on_connect=False)
         except ssl.SSLError as e:
@@ -109,7 +113,6 @@ class ChatServer:
         """
         Service a client connection for read/write events.
         """
-
         tls_conn = key.fileobj
         data = key.data
 
@@ -123,7 +126,10 @@ class ChatServer:
                 # We need more reads/writes; return and wait for next event
                 return
             except (OSError, ssl.SSLError) as e:
-                # Hard error, close
+                # Remove persistent listener if set
+                if hasattr(data, 'username'):
+                    if data.username in self.listeners and self.listeners[data.username] is data:
+                        del self.listeners[data.username]
                 self.logger.error("TLS handshake failed: %s", e)
                 self.sel.unregister(tls_conn)
                 tls_conn.close()
@@ -136,6 +142,9 @@ class ChatServer:
             except ssl.SSLWantReadError:
                 return
             except ssl.SSLError as e:
+                if hasattr(data, 'username'):
+                    if data.username in self.listeners and self.listeners[data.username] is data:
+                        del self.listeners[data.username]
                 self.logger.error("TLS read error: %s", e)
                 self.sel.unregister(tls_conn)
                 tls_conn.close()
@@ -147,6 +156,9 @@ class ChatServer:
                 data.inb += recv_data
             else:
                 self.logger.debug(f"Closing connection to {data.addr}")
+                if hasattr(data, 'username'):
+                    if data.username in self.listeners and self.listeners[data.username] is data:
+                        del self.listeners[data.username]
                 self.sel.unregister(tls_conn)
                 tls_conn.close()
                 return
@@ -192,6 +204,9 @@ class ChatServer:
                 except ssl.SSLWantWriteError:
                     return
                 except ssl.SSLError as e:
+                    if hasattr(data, 'username'):
+                        if data.username in self.listeners and self.listeners[data.username] is data:
+                            del self.listeners[data.username]
                     self.logger.error("TLS write error: %s", e)
                     self.sel.unregister(tls_conn)
                     tls_conn.close()
@@ -247,17 +262,23 @@ class ChatServer:
             username = req.get("from", "")
             session_id = req.get("session_id")
             if not session_id or session_id not in self.active_sessions or self.active_sessions[session_id] != username:
-                return {"status": "error", "error": "Invalid session for listening"}
+                result = {"status": "error", "error": "Invalid session for listening"}
+                self.logger.info("Returning from handle_json_request (listen): %s", result)
+                return result
             # Record this connection as the listener for the given username.
             key.data.username = username  # attach the username to the connection data
             self.listeners[username] = key.data
-            return {"status": "ok", "message": "Listening for real-time messages"}
+            result = {"status": "ok", "message": "Listening for real-time messages"}
+            self.logger.info("Returning from handle_json_request (listen): %s", result)
+            return result
 
         else:
-            return {
+            result = {
                 "status": "error",
                 "error": f"Unknown action: {action}"
             }
+            self.logger.info("Returning from handle_json_request (unknown action): %s", result)
+            return result
 
     def handle_register(self, username, password):
         """
@@ -265,11 +286,12 @@ class ChatServer:
         """
         # 1) Check password length
         if len(password) >= 256:
-            # Example JSON error message
-            return {
+            result = {
                 "status": "error",
                 "error": "Password is too long"
             }
+            self.logger.info("Returning from handle_register: %s", result)
+            return result
 
         # 2) Check if username already exists
         conn = sqlite3.connect(self.db_file)
@@ -279,10 +301,12 @@ class ChatServer:
 
         if row is not None:
             conn.close()
-            return {
+            result = {
                 "status": "error",
                 "error": "Username already exists"
             }
+            self.logger.info("Returning from handle_register: %s", result)
+            return result
 
         # 3) Hash the password
         hashed_pass = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -293,16 +317,20 @@ class ChatServer:
             conn.commit()
         except Exception as e:
             conn.close()
-            return {
+            result = {
                 "status": "error",
                 "error": f"Database error: {str(e)}"
             }
+            self.logger.info("Returning from handle_register: %s", result)
+            return result
 
         conn.close()
-        return {
+        result = {
             "status": "ok",
             "message": "Registration successful"
         }
+        self.logger.info("Returning from handle_register: %s", result)
+        return result
 
     def handle_login(self, username, password):
         """
@@ -317,48 +345,60 @@ class ChatServer:
         conn.close()
 
         if not row:
-            return {
+            result = {
                 "status": "error",
                 "error": "Invalid username or password"
             }
+            self.logger.info("Returning from handle_login: %s", result)
+            return result
 
         stored_hashed_pass = row[0]
         # 2) Check the provided password against the stored hash
         if not bcrypt.checkpw(password.encode('utf-8'), stored_hashed_pass.encode('utf-8')):
-            return {
+            result = {
                 "status": "error",
                 "error": "Invalid username or password"
             }
+            self.logger.info("Returning from handle_login: %s", result)
+            return result
 
         # 3) If valid, create a session ID
         session_id = secrets.token_hex(16)
         self.active_sessions[session_id] = username
-        self.logger.debug(f"Created session ID: {session_id} for user: {username}")
+        self.logger.info(f"Created session ID: {session_id} for user: {username}")
 
-        return {
+        result = {
             "status": "ok",
             "session_id": session_id
         }
+        self.logger.info("Returning from handle_login: %s", result)
+        return result
 
     def handle_message(self, session_id, from_user, to_user, msg):
         """
         Handle the 'message' action by verifying the session and user,
-        then storing the message in the database (undelivered) or delivering in real-time.
+        then storing the message in the database (undelivered) and, if possible,
+        delivering it in real-time (and marking it as delivered). If real-time push fails
+        or the recipient is not online, the message remains for later fetching.
         """
         # 1) Check session
         if not session_id or session_id not in self.active_sessions:
             self.logger.error(f"Invalid session: {session_id} from user: {from_user}")
-            return {
+            result = {
                 "status": "error",
                 "error": "Invalid session"
             }
+            self.logger.info("Returning from handle_message: %s", result)
+            return result
 
         # 2) Confirm that from_user matches this session
         if from_user != self.active_sessions[session_id]:
-            return {
+            result = {
                 "status": "error",
                 "error": "Session does not match 'from' user"
             }
+            self.logger.info("Returning from handle_message: %s", result)
+            return result
         
         # 3) Check if recipient exists
         conn = sqlite3.connect(self.db_file)
@@ -368,45 +408,64 @@ class ChatServer:
 
         if row is None:
             conn.close()
-            return {
+            result = {
                 "status": "error",
                 "error": "Recipient does not exist"
             }
+            self.logger.info("Returning from handle_message: %s", result)
+            return result
 
-        # REAL-TIME MOD: If recipient is online, try to push the message immediately.
-        if to_user in self.listeners:
-            listener_data = self.listeners[to_user]
-            try:
-                push_obj = {"status": "ok", "from": from_user, "message": msg}
-                self.queue_json_message(listener_data, push_obj)
-                conn.close()
-                return {
-                    "status": "ok",
-                    "message": f"Message delivered to {to_user} in real-time"
-                }
-            except Exception as e:
-                # If real-time push fails, fall back to storing in DB.
-                self.logger.error(f"Real-time delivery failed: {str(e)}")
-
-        # 4) Store the message in the 'messages' table as undelivered
+        # --- NEW: Always store the message in the database first (undelivered) ---
         try:
             c.execute("""
                 INSERT INTO messages (from_user, to_user, content, delivered) 
                 VALUES (?, ?, ?, 0)
             """, (from_user, to_user, msg))
+            message_id = c.lastrowid
             conn.commit()
         except Exception as e:
             conn.close()
-            return {
+            result = {
                 "status": "error",
                 "error": f"Database error: {str(e)}"
             }
+            self.logger.info("Returning from handle_message: %s", result)
+            return result
 
-        conn.close()
-        return {
-            "status": "ok",
-            "message": f"Message delivered to {to_user}"
-        }
+        # --- REAL-TIME MOD: If recipient is online, attempt to push the message ---
+        if to_user in self.listeners:
+            listener_data = self.listeners[to_user]
+            try:
+                push_obj = {"status": "ok", "from": from_user, "message": msg}
+                self.queue_json_message(listener_data, push_obj)
+                # If push succeeds, mark this message as delivered in the database.
+                c.execute("UPDATE messages SET delivered=1 WHERE id=?", (message_id,))
+                conn.commit()
+                conn.close()
+                result = {
+                    "status": "ok",
+                    "message": f"Message delivered to {to_user} in real-time"
+                }
+                self.logger.info("Returning from handle_message: %s", result)
+                return result
+            except Exception as e:
+                self.logger.error(f"Real-time delivery failed: {str(e)}")
+                # If the push fails, leave the message undelivered for later retrieval.
+                conn.close()
+                result = {
+                    "status": "ok",
+                    "message": f"Message stored for delivery to {to_user}"
+                }
+                self.logger.info("Returning from handle_message: %s", result)
+                return result
+        else:
+            conn.close()
+            result = {
+                "status": "ok",
+                "message": f"Message stored for delivery to {to_user}"
+            }
+            self.logger.info("Returning from handle_message: %s", result)
+            return result
 
     # ===============================
     # NEW: Handle list_accounts action
@@ -421,10 +480,12 @@ class ChatServer:
         # 1) Check session
         if not session_id or session_id not in self.active_sessions:
             self.logger.error(f"Invalid session for list_accounts: {session_id}")
-            return {
+            result = {
                 "status": "error",
                 "error": "Invalid session"
             }
+            self.logger.info("Returning from handle_list_accounts: %s", result)
+            return result
 
         # 2) For safety, ensure the pattern is not empty. If empty, list all.
         if not pattern.strip():
@@ -444,19 +505,23 @@ class ChatServer:
             rows = c.fetchall()
         except Exception as e:
             conn.close()
-            return {
+            result = {
                 "status": "error",
                 "error": f"Database error: {str(e)}"
             }
+            self.logger.info("Returning from handle_list_accounts: %s", result)
+            return result
 
         # Format rows into a list of usernames
         accounts = [r[0] for r in rows]
         conn.close()
 
-        return {
+        result = {
             "status": "ok",
             "accounts": accounts
         }
+        self.logger.info("Returning from handle_list_accounts: %s", result)
+        return result
 
     # ===============================
     # NEW: Handle read_messages action
@@ -471,17 +536,21 @@ class ChatServer:
         # 1) Validate session
         if not session_id or session_id not in self.active_sessions:
             self.logger.error(f"Invalid session for read_messages: {session_id}")
-            return {
+            result = {
                 "status": "error",
                 "error": "Invalid session"
             }
+            self.logger.info("Returning from handle_read_messages: %s", result)
+            return result
 
         # 2) Confirm that from_user matches this session
         if from_user != self.active_sessions[session_id]:
-            return {
+            result = {
                 "status": "error",
                 "error": "Session does not match 'from' user"
             }
+            self.logger.info("Returning from handle_read_messages: %s", result)
+            return result
 
         # 3) Parse the count
         try:
@@ -513,10 +582,12 @@ class ChatServer:
             conn.commit()
         except Exception as e:
             conn.close()
-            return {
+            result = {
                 "status": "error",
                 "error": f"Database error: {str(e)}"
             }
+            self.logger.info("Returning from handle_read_messages: %s", result)
+            return result
 
         # Build a list of message objects
         messages_list = []
@@ -529,10 +600,12 @@ class ChatServer:
 
         conn.close()
 
-        return {
+        result = {
             "status": "ok",
             "messages": messages_list
         }
+        self.logger.info("Returning from handle_read_messages: %s", result)
+        return result
 
     def start(self):
         """

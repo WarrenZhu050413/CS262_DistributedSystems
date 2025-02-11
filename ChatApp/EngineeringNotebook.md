@@ -233,7 +233,11 @@ As the code grows, it is becoming more and more difficult to reason about the co
 
 With most of the funamental architecture in place, we made our message delivery more robust with the following changes.
 
-1. Confirmed that the recipient username exists. If not, then we throw an appropriate error to notify the user.
+1. Allow users to use wildcard patterns to search for existing users to send messages to.
+2. Confirmed that the recipient username exists. If not, then we throw an appropriate error to notify the user.
+3. Cleaned up GUI so that the text fields are more streamlined with Login, Register, and Send Message buttons
+4. Added multi-threading so that real-time messaging is enabled when both sender and recipient are online. Messages sent when the recipient is offline are stored to be fetched by the recipient when they log back in.
+5. Display messages sent by a user in addition to messages that they receive.
 
 ### Wire Protocol
 1. Different types of messages that we need to support
