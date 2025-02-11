@@ -18,7 +18,11 @@ class ChatClient:
     def build_message(self, action: str, from_user: str, to_user: str, password: str, msg: str) -> Dict[str, Any]:
         """
         Build a JSON dictionary with the specified parameters.
-        Returns a python dictionary.
+        Returns a Python dictionary.
+        
+        'action' can be "register", "login", "message", "list_accounts", or "read_messages".
+        'msg' is reused for various purposes (e.g. the text pattern for list_accounts,
+        the number of messages to fetch for read_messages, etc.).
         """
         return {
             "action": action,
@@ -33,6 +37,12 @@ class ChatClient:
         """
         Build the request, send it over the socket, receive the response.
         Return the parsed JSON response.
+
+        Example usage for listing accounts:
+            send_request("list_accounts", my_user, "", "", "A%")
+
+        Example usage for reading messages (fetch 5 messages):
+            send_request("read_messages", my_user, "", "", "5")
         """
         request_obj: Dict[str, Any] = self.build_message(action, from_user, to_user, password, msg)
         wire_message: str = json.dumps(request_obj)
@@ -60,7 +70,7 @@ class ChatClient:
                 # Parse and handle JSON
                 resp_json: Dict[str, Any] = json.loads(resp_data.decode('utf-8'))
 
-                # Store the session_id 
+                # Store the session_id if provided by the server
                 if "session_id" in resp_json:
                     self.session_id = resp_json["session_id"]
                 return resp_json

@@ -52,6 +52,9 @@ class ChatServer:
         """
         Create a 'users' table in SQLite if it doesn't exist.
         Columns: username TEXT PRIMARY KEY, password TEXT (hashed password).
+        
+        NOTE: We also create a 'messages' table for storing undelivered messages,
+        and any other tables we need (for example, for listing accounts).
         """
         self.logger.debug("Setting up database...")
         conn = sqlite3.connect(self.db_file)
@@ -60,6 +63,17 @@ class ChatServer:
             CREATE TABLE IF NOT EXISTS users (
                 username TEXT PRIMARY KEY,
                 password TEXT
+            )
+        """)
+        # New table for storing messages.
+        # 'delivered' will be 0 if undelivered, 1 if delivered.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                from_user TEXT NOT NULL,
+                to_user TEXT NOT NULL,
+                content TEXT NOT NULL,
+                delivered INTEGER NOT NULL DEFAULT 0
             )
         """)
         conn.commit()
@@ -211,6 +225,19 @@ class ChatServer:
             message = req.get("message", "")
             return self.handle_message(session_id, from_user, to_user, message)
 
+        # NEW: Handle listing of accounts
+        elif action == "list_accounts":
+            session_id = req.get("session_id")
+            pattern = req.get("message", "")  # Using 'message' field for the pattern
+            return self.handle_list_accounts(session_id, pattern)
+
+        # NEW: Handle reading undelivered messages
+        elif action == "read_messages":
+            session_id = req.get("session_id")
+            from_user = req.get("from", "")   # The user who is requesting messages
+            count_str = req.get("message", "")  # We'll parse how many messages to fetch
+            return self.handle_read_messages(session_id, from_user, count_str)
+
         else:
             return {
                 "status": "error",
@@ -301,7 +328,7 @@ class ChatServer:
     def handle_message(self, session_id, from_user, to_user, msg):
         """
         Handle the 'message' action by verifying the session and user,
-        then printing (or forwarding) the message.
+        then storing the message in the database (undelivered).
         """
         # 1) Check session
         if not session_id or session_id not in self.active_sessions:
@@ -331,12 +358,150 @@ class ChatServer:
                 "error": "Recipient does not exist"
             }
 
-        # 4) "Send" the message (here, just print to server console)
-        print(f"[MESSAGE] {from_user} -> {to_user}: {msg}")
+        # 4) Store the message in the 'messages' table as undelivered
+        try:
+            c.execute("""
+                INSERT INTO messages (from_user, to_user, content, delivered) 
+                VALUES (?, ?, ?, 0)
+            """, (from_user, to_user, msg))
+            conn.commit()
+        except Exception as e:
+            conn.close()
+            return {
+                "status": "error",
+                "error": f"Database error: {str(e)}"
+            }
 
+        conn.close()
         return {
             "status": "ok",
             "message": f"Message delivered to {to_user}"
+        }
+
+    # ===============================
+    # NEW: Handle list_accounts action
+    # ===============================
+    def handle_list_accounts(self, session_id, pattern):
+        """
+        Handle the 'list_accounts' action by verifying session,
+        then returning a list of usernames matching the given pattern.
+        The client can do wildcard matching; for example, 'a%' 
+        to get all users starting with 'a'.
+        """
+        # 1) Check session
+        if not session_id or session_id not in self.active_sessions:
+            self.logger.error(f"Invalid session for list_accounts: {session_id}")
+            return {
+                "status": "error",
+                "error": "Invalid session"
+            }
+
+        # 2) For safety, ensure the pattern is not empty. If empty, list all.
+        if not pattern.strip():
+            # If the client sends an empty pattern, let's treat it as '*' (match all)
+            pattern = "%"
+        else:
+            # Convert simple wildcard '*' to '%'
+            # (If your client already sends a proper SQL LIKE pattern, skip this.)
+            # e.g., if pattern='abc*', then pattern='abc%'
+            if "*" in pattern:
+                pattern = pattern.replace("*", "%")
+
+        conn = sqlite3.connect(self.db_file)
+        c = conn.cursor()
+        try:
+            c.execute("SELECT username FROM users WHERE username LIKE ?", (pattern,))
+            rows = c.fetchall()
+        except Exception as e:
+            conn.close()
+            return {
+                "status": "error",
+                "error": f"Database error: {str(e)}"
+            }
+
+        # Format rows into a list of usernames
+        accounts = [r[0] for r in rows]
+        conn.close()
+
+        return {
+            "status": "ok",
+            "accounts": accounts
+        }
+
+    # ===============================
+    # NEW: Handle read_messages action
+    # ===============================
+    def handle_read_messages(self, session_id, from_user, count_str):
+        """
+        Handle the 'read_messages' action by verifying the session,
+        then returning up to 'count' undelivered messages where to_user=from_user.
+
+        'count_str' is the string representing how many messages to retrieve.
+        """
+        # 1) Validate session
+        if not session_id or session_id not in self.active_sessions:
+            self.logger.error(f"Invalid session for read_messages: {session_id}")
+            return {
+                "status": "error",
+                "error": "Invalid session"
+            }
+
+        # 2) Confirm that from_user matches this session
+        if from_user != self.active_sessions[session_id]:
+            return {
+                "status": "error",
+                "error": "Session does not match 'from' user"
+            }
+
+        # 3) Parse the count
+        try:
+            count = int(count_str)
+        except ValueError:
+            count = 5  # default if the client gave something invalid
+
+        # 4) Fetch up to 'count' undelivered messages addressed to this user
+        conn = sqlite3.connect(self.db_file)
+        c = conn.cursor()
+        try:
+            c.execute("""
+                SELECT id, from_user, content 
+                FROM messages 
+                WHERE to_user=? AND delivered=0 
+                ORDER BY id 
+                LIMIT ?
+            """, (from_user, count))
+            rows = c.fetchall()
+
+            # Mark these messages as delivered
+            msg_ids = [r[0] for r in rows]
+            if msg_ids:
+                # We only update if there are messages
+                c.executemany(
+                    "UPDATE messages SET delivered=1 WHERE id=?",
+                    [(mid,) for mid in msg_ids]
+                )
+            conn.commit()
+        except Exception as e:
+            conn.close()
+            return {
+                "status": "error",
+                "error": f"Database error: {str(e)}"
+            }
+
+        # Build a list of message objects
+        messages_list = []
+        for row in rows:
+            _id, from_user_db, content = row
+            messages_list.append({
+                "from": from_user_db,
+                "content": content
+            })
+
+        conn.close()
+
+        return {
+            "status": "ok",
+            "messages": messages_list
         }
 
     def start(self):
