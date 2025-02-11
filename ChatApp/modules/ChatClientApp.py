@@ -268,7 +268,7 @@ class ChatClientApp:
                 if msgs:
                     for m in msgs:
                         # Each m might be something like {"from": "...", "content": "..."}
-                        frm = m.get("from", "unknown")
+                        frm = m.get("from_user", "unknown")
                         content = m.get("content", "")
                         self._append_incoming_messages(f"From {frm}: {content}\n")
                 else:
@@ -299,8 +299,8 @@ class ChatClientApp:
         Since this runs in a background thread, we use self.root.after to update the GUI.
         """
         def update_gui():
-            if msg_json.get("status") == "ok" and "message" in msg_json and "from" in msg_json:
-                self._append_incoming_messages(f"Real-time from {msg_json['from']}: {msg_json['message']}\n")
+            if msg_json.get("status") == "ok" and "message" in msg_json and "from_user" in msg_json:
+                self._append_incoming_messages(f"Real-time from {msg_json['from_user']}: {msg_json['message']}\n")
             elif msg_json.get("status") == "error":
                 self._append_incoming_messages(f"Real-time error: {msg_json.get('error')}\n")
             else:

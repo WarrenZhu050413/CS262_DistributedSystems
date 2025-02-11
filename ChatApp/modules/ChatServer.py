@@ -229,20 +229,20 @@ class ChatServer:
         """
         action = req.get("action", "").lower()
         if action == "register":
-            username = req.get("from_user", "")
+            username = req.get("from_user", "")   # Use "from_user"
             password = req.get("password", "")
             return self.handle_register(username, password)
 
         elif action == "login":
-            username = req.get("from_user", "")
+            username = req.get("from_user", "")   # Use "from_user"
             password = req.get("password", "")
             return self.handle_login(username, password)
 
         elif action == "message":
             session_id = req.get("session_id")
-            from_user = req.get("from_user", "")
-            to_user = req.get("to_user", "")
-            message = req.get("message", "")
+            from_user = req.get("from_user", "")  # 
+            to_user = req.get("to_user", "")      # now use "to_user"
+            message = req.get("message", "") # now use "message"
             return self.handle_message(session_id, from_user, to_user, message)
 
         # NEW: Handle listing of accounts
@@ -254,13 +254,13 @@ class ChatServer:
         # NEW: Handle reading undelivered messages
         elif action == "read_messages":
             session_id = req.get("session_id")
-            from_user = req.get("from_user", "")   # The user who is requesting messages
-            count_str = req.get("message", "")  # We'll parse how many messages to fetch
+            from_user = req.get("from_user", "")   # Use "from_user" for consistency
+            count_str = req.get("message", "")
             return self.handle_read_messages(session_id, from_user, count_str)
 
         # NEW: Handle persistent listener connection for real-time messages
         elif action == "listen":
-            username = req.get("from_user", "")
+            username = req.get("from_user", "")  # req.get("from_user", "")
             session_id = req.get("session_id")
             if not session_id or session_id not in self.active_sessions or self.active_sessions[session_id] != username:
                 result = {"status": "error", "error": "Invalid session for listening"}
@@ -609,9 +609,10 @@ class ChatServer:
         for row in rows:
             _id, from_user_db, content = row
             messages_list.append({
-                "from_user": from_user_db,
+                "from_user": from_user_db,  # use "from_user"
                 "content": content
             })
+
 
         conn.close()
 

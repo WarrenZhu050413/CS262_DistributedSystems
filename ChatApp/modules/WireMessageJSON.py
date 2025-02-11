@@ -20,10 +20,10 @@ class WireMessageJSON(WireMessage):
         message_json = {
             "protocol_version": cls.protocol_version,
             "action": action,
-            "from_user": from_user,
-            "to_user": to_user,
+            "from_user": from_user,          # "from_user"
+            "to_user": to_user,              # "to_user"
             "password": password,
-            "msg": msg,
+            "message": msg,             # use "message" instead of "msg"
             "session_id": session_id
         }
         return cls.encode_message(message_json)
