@@ -159,7 +159,12 @@ class ChatClientApp:
                 self.message_var.set("")
             # REAL-TIME MOD: After a successful login, start the persistent listener.
             if action == "login" and "session_id" in resp_json:
+                # Retrieve the unread message count (default to 0 if not provided)
+                unread = resp_json.get("unread_messages", 0)
+                # Update the response label to show the unread messages count
+                self.response_label.config(text=f"Login successful. You have {unread} unread messages.")
                 self.client.start_listener(from_user, self.handle_incoming_message)
+
         except ConnectionRefusedError:
             self.response_label.config(text="Could not connect to server. Is it running?")
         except Exception as e:

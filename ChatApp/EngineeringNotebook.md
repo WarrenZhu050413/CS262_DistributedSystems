@@ -310,6 +310,7 @@ ChatClientApp.on_send_click() -> ChatClient.send_request() -> ChatClient._read_r
 Perhaps the most convenient way to create our custom wire protocol is to it in custom binary format, and then when receiving it, 
 
 
+
 ### Wire Protocol
 1. Different types of messages that we need to support
 

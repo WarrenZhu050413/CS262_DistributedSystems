@@ -343,9 +343,17 @@ class ChatServer:
         self.active_sessions[session_id] = username
         self.logger.info(f"Created session ID: {session_id} for user: {username}")
 
-        result = {"status": "ok", "session_id": session_id}
+        # --- NEW: Count unread (undelivered) messages for this user ---
+        conn = sqlite3.connect(self.db_file)
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM messages WHERE to_user=? AND delivered=0", (username,))
+        unread_count = c.fetchone()[0]
+        conn.close()
+
+        result = {"status": "ok", "session_id": session_id, "unread_messages": unread_count}
         self.logger.info("Returning from handle_login: %s", result)
         return result
+
 
     def handle_message(self, session_id, from_user, to_user, msg):
         if not session_id or session_id not in self.active_sessions:
