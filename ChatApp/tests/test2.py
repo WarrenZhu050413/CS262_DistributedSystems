@@ -129,9 +129,9 @@ class TestChatApp(WireProtocolTest):
         Steps:
           1. Register and login a sender.
           2. Register a recipient but do not start its persistent listener (simulate offline).
-          3. Sender sends a message to the recipient.
+          3. Sender sends multiple messages to the recipient.
           4. Recipient logs in later and fetches messages.
-          5. Verify that the fetched messages contain the sent message.
+          5. Verify that the fetched messages contain all sent messages.
         """
         client_sender = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
         client_recipient = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
@@ -139,7 +139,7 @@ class TestChatApp(WireProtocolTest):
         sender_username = "sender_" + "".join(random.choices(string.ascii_lowercase, k=6))
         recipient_username = "recipient_" + "".join(random.choices(string.ascii_lowercase, k=6))
         password = "testpass"
-        test_message = "Offline message test"
+        test_messages = [f"Offline message test #{i}" for i in range(15)]
 
         # Register both users.
         for user in [sender_username, recipient_username]:
@@ -175,17 +175,21 @@ class TestChatApp(WireProtocolTest):
         self.assertEqual(resp_recipient.get("status"), "ok", f"Login failed for recipient: {resp_recipient}")
         self.assertIn("session_id", resp_recipient, "No session_id returned on recipient login")
 
-        # Sender sends a message.
-        resp_msg = client_sender.send_request(
-            action="message",
-            from_user=sender_username,
-            to_user=recipient_username,
-            password="",
-            msg=test_message
-        )
-        self.assertEqual(resp_msg.get("status"), "ok", f"Message send failed: {resp_msg}")
+        # Sender sends multiple messages.
+        sent_messages = []
+        for test_message in test_messages:
+            resp_msg = client_sender.send_request(
+                action="message",
+                from_user=sender_username,
+                to_user=recipient_username,
+                password="",
+                msg=test_message
+            )
+            self.assertEqual(resp_msg.get("status"), "ok", f"Message send failed: {resp_msg}")
+            sent_messages.append(test_message)
+            time.sleep(0.1)  # Small delay between messages
 
-        # Allow time for the message to be stored.
+        # Allow time for all messages to be stored.
         time.sleep(0.5)
 
         # Simulate recipient coming online (new client instance) and fetch messages.
@@ -198,19 +202,28 @@ class TestChatApp(WireProtocolTest):
             msg=""
         )
         self.assertEqual(resp_recipient_new.get("status"), "ok", f"Recipient re-login failed: {resp_recipient_new}")
+        
         # Fetch messages.
         resp_fetch = client_recipient_new.send_request(
             action="read_messages",
             from_user=recipient_username,
             to_user="",
             password="",
-            msg="10"
+            msg="15"  # Request all 15 messages
         )
         self.assertEqual(resp_fetch.get("status"), "ok", f"Fetch messages failed: {resp_fetch}")
         messages = resp_fetch.get("messages", [])
-        found = any(test_message in m.get("content", "") for m in messages)
-        self.assertTrue(found, "Fetched messages did not include the offline message")
-        print(f"Offline message fetching successful for {recipient_username}")
+        
+        # Verify all sent messages were received
+        received_messages = [m.get("content", "") for m in messages]
+        for sent_msg in sent_messages:
+            self.assertIn(sent_msg, received_messages, f"Message '{sent_msg}' not found in fetched messages")
+        
+        # Verify the count of messages
+        self.assertEqual(len(messages), len(sent_messages), 
+                        f"Expected {len(sent_messages)} messages, but got {len(messages)}")
+        
+        print(f"Successfully fetched {len(messages)} offline messages for {recipient_username}")
 
     def test_message_to_nonexistent_user(self):
         """

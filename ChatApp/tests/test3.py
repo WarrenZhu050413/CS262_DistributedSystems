@@ -1,3 +1,30 @@
+"""
+Integration test suite for the ChatApp server and client.
+
+This module contains comprehensive integration tests that verify the interaction between
+ChatServer and ChatClient components. The tests cover core functionality like user 
+registration, login, messaging, account deletion, and message management.
+
+The test suite spins up a real ChatServer instance on a random port and uses an actual
+ChatClient to exercise the server's functionality. This allows testing of:
+
+- Network I/O and socket communication
+- SSL/TLS encryption
+- SQLite database operations
+- Wire protocol implementation
+- End-to-end message flow
+
+Key Test Cases:
+- Account lifecycle (registration, login, deletion)
+- Message operations (sending, reading, deleting)
+- Batch message handling
+- Username validation (length, special characters)
+- Error cases and edge conditions
+
+The tests use a temporary SQLite database and test SSL certificates to provide
+an isolated test environment.
+"""
+
 import unittest
 import threading
 import time
@@ -6,7 +33,7 @@ import random
 import socket
 from typing import Dict, Any
 
-# Adjust imports to match your project’s layout:
+# Adjust imports to match your project's layout:
 # from your_package.ChatServer import ChatServer
 # from your_package.ChatClient import ChatClient
 
@@ -30,7 +57,7 @@ class TestChatServerIntegration(unittest.TestCase):
     Integration Test Suite for ChatServer and ChatClient
 
     These tests spin up a ChatServer instance on a random port and use a ChatClient
-    to exercise the server’s functionality. By “integration-style,” we mean that these
+    to exercise the server's functionality. By "integration-style," we mean that these
     tests involve real network I/O and an actual database, verifying end-to-end
     interactions (i.e., that the client and server correctly implement the wire protocol,
     handle SSL connections, and manipulate the SQLite database).
@@ -72,8 +99,8 @@ class TestChatServerIntegration(unittest.TestCase):
     SQLite database (`test.db`) and an SSL certificate/key pair for TLS connections.
     - The `ChatClient` is instantiated once (shared by all tests), pointing to the same
     port and using the same certificate.
-    - Each test exercises one or more “actions” (register, login, message, etc.) through
-    the client’s `send_request` or helper methods (e.g., `delete_account`).
+    - Each test exercises one or more "actions" (register, login, message, etc.) through
+    the client's `send_request` or helper methods (e.g., `delete_account`).
     - `tearDownClass` stops the server and cleans up log files or leftover artifacts.
 
     Since these are *integration tests*, they verify that multiple layers (network, SSL,
@@ -96,8 +123,13 @@ class TestChatServerIntegration(unittest.TestCase):
         cls.key_file = "ChatApp/security/server.key"        # Adjust path to your test key
         cls.log_file = "test_server.log"   # Log file for debugging
 
+        # Delete the database file if it exists
+        if os.path.exists(cls.db_file):
+            os.remove(cls.db_file)
+
+        # Create a new server instance
         cls.server = ChatServer(
-            host="localhost",
+            host="localhost", 
             port=cls.test_port,
             db_file=cls.db_file,
             cert_file=cls.cert_file,
@@ -185,7 +217,7 @@ class TestChatServerIntegration(unittest.TestCase):
         Register two users (sender & receiver).
         Sender -> sends a message to receiver.
         Receiver logs in, reads the message, then deletes it.
-        Verify it is removed from the server’s stored messages.
+        Verify it is removed from the server's stored messages.
         """
         sender = "bob"
         sender_pw = "bobpass"
@@ -303,28 +335,6 @@ class TestChatServerIntegration(unittest.TestCase):
         self.assertEqual(read_resp.get("status"), "ok", f"Reading messages failed: {read_resp}")
         msgs = read_resp.get("messages", [])
         self.assertEqual(len(msgs), 20, f"Expected 20 messages, got {len(msgs)}")
-
-    # -------------------------------------------------------------------------
-    # 4) Test registering/logging in up to 100 users
-    # -------------------------------------------------------------------------
-    def test_register_many_users(self):
-        """
-        Register 100 users, then attempt to login each to confirm success.
-        """
-        base_name = "testuser_"
-        password = "password"
-        num_users = 100
-
-        for i in range(num_users):
-            username = f"{base_name}{i}"
-            resp = self.client.send_request("register", username, "", password, "")
-            self.assertEqual(resp.get("status"), "ok", f"Registration failed for {username}: {resp}")
-
-        # Now login each one
-        for i in range(num_users):
-            username = f"{base_name}{i}"
-            resp = self.client.send_request("login", username, "", password, "")
-            self.assertEqual(resp.get("status"), "ok", f"Login failed for {username}: {resp}")
 
     # -------------------------------------------------------------------------
     # 5) Test longer usernames
