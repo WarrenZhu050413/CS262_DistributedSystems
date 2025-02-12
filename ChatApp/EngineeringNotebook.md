@@ -303,13 +303,6 @@ Build a basic front-end and back-end first. The aim is that they can exchange me
 1. **Group Chat**  
    - Extend the `to` field to accept a list of recipients or a group name.  
    - Server would then handle sending to multiple recipients at once.  
-2. **Attachments or File Transfers**  
-   - Potentially store small files in the database or have a separate file server; we need to define size limits.  
-3. **Message Read Receipts**  
+2. **Message Read Receipts**  
    - Add a status to each message row in the database: `delivered`, `read`, etc.  
-   - Update once the client confirms reading.  
-4. **Refine Security**  
-   - Use more robust hashing (`bcrypt` with stronger parameters or `argon2`).  
-   - Explore OAUTH / JWT for session management if scaling up.  
-5. **Docker Containerization**  
-   - Make the deployment simpler by packaging the server (and possibly the client) into a Docker image.  
+   - Update once the client confirms reading.
