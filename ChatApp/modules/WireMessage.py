@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Tuple, Optional
 import socket
+from typing import Optional, Any, Dict
 
 class WireMessage(ABC):
     """
@@ -82,7 +83,7 @@ class WireMessage(ABC):
 
     @classmethod
     @abstractmethod
-    def parse_wire_message(cls, wire_message: bytes) -> dict[str, Any]:
+    def parse_wire_message(cls, wire_message: bytes) -> Dict[str, Any]:
         """
         Parse the given wire message (bytes) and return a tuple:
         (action, from_user, to_user, password, msg).
