@@ -128,15 +128,13 @@ ChatApp/
 ### BinaryWireMessage
 - **File**: `modules/binarywiremessage.py`  
 - **Description**:  
-  Implements a more compact wire protocol by using Python’s `repr`/`ast.literal_eval` approach for dictionary encoding. Like the JSON approach, it also uses a 4-byte length prefix.
+  Implements a more compact wire protocol by using custom dictionary encoding. Like the JSON approach, it also uses a 4-byte length prefix.
 - **Key Responsibilities**:
-  - Provide more efficient encoding than raw JSON (though still textual under the hood).
-  - Preserve the same structure (length prefix, dictionary-based messaging).
+  - Provide more efficient encoding than raw JSON.
+  - Preserve the same structure.
 - **Ideal Use Cases**:
   - Faster transmission and parsing than JSON.
   - Potential future enhancements for true binary formats or compression.
-- **Problems**:
-  - Hard to maintain because it is a binary protocol and not using external packages.
 
 ### ChatClient
 - **File**: `modules/chatclient.py`  
@@ -354,9 +352,9 @@ Implements the JSON-based wire protocol:
 - **`read_wire_message(sock) -> bytes`**: Reads the length prefix and then the JSON payload.
 
 ### `modules/binarywiremessage.py`
-Implements a simpler binary protocol by using `repr()` for serialization:
-- **`encode_message(message: dict) -> bytes`**: Uses a 4-byte length + the `repr` of the dictionary.  
-- **`parse_wire_message(wire_message: bytes) -> dict`**: Converts a UTF-8 string back into a Python dictionary with `ast.literal_eval`.
+Implements a simpler binary protocol by using custom serialization function:
+- **`encode_message(message: dict) -> bytes`**: Uses a 4-byte length + the custom string transformation of the dictionary.  
+- **`parse_wire_message(wire_message: bytes) -> dict`**: Converts a UTF-8 string back into a dictionary using our custom deserialization function.
 
 ### `modules/chatclient.py`
 - **Class**: `ChatClient`  
