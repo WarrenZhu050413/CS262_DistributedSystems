@@ -1,5 +1,4 @@
 import socket
-import json
 import ssl
 import threading  # REAL-TIME MOD: Needed for the listener thread
 from typing import Dict, Any, Optional
@@ -21,16 +20,10 @@ class ChatClient:
         self.listener_thread = None
         self.listener_socket = None
 
-    def _parse_response(self, response: bytes) -> Dict[str, Any]:
-        """
-        Parse the response from the server.
-        """
-        return json.loads(response.decode('utf-8'))
-
     def send_request(self, action: str, from_user: str, to_user: str, password: str, msg: str) -> Dict[str, Any]:
         """
         Build the request, send it over the socket, receive the response.
-        Return the parsed JSON response.
+        Return the parsed response.
         """
         wire_message: bytes = WireMessageJSON.make_wire_message(
             action=action,
@@ -50,12 +43,12 @@ class ChatClient:
 
                 # Read the response.
                 resp_bytes: bytes = WireMessageJSON.read_wire_message(s)
-                resp_json: Dict[str, Any] = WireMessageJSON.parse_wire_message(resp_bytes)
+                resp_dict: Dict[str, Any] = WireMessageJSON.parse_wire_message(resp_bytes)
 
                 # Store the session_id if provided by the server.
-                if "session_id" in resp_json:
-                    self.session_id = resp_json["session_id"]
-                return resp_json
+                if "session_id" in resp_dict:
+                    self.session_id = resp_dict["session_id"]
+                return resp_dict
             
     def delete_account(self, username):
         wire_message = WireMessageJSON.make_wire_message(
@@ -72,8 +65,8 @@ class ChatClient:
             with self.context.wrap_socket(raw_socket, server_side=False, server_hostname=self.host) as s:
                 s.sendall(wire_message)
                 resp_bytes: bytes = WireMessageJSON.read_wire_message(s)
-                resp_json: Dict[str, Any] = WireMessageJSON.parse_wire_message(resp_bytes)
-                return resp_json
+                resp_dict: Dict[str, Any] = WireMessageJSON.parse_wire_message(resp_bytes)
+                return resp_dict
 
     # ------------------------------
     # NEW: Persistent listener for real-time messages
@@ -116,8 +109,8 @@ class ChatClient:
                         msg_bytes = WireMessageJSON.read_wire_message(s)
                     except Exception as e:
                         break  # Exit loop if an error occurs (or if the socket is closed)
-                    msg_json = WireMessageJSON.parse_wire_message(msg_bytes)
-                    callback(msg_json)
+                    msg_dict = WireMessageJSON.parse_wire_message(msg_bytes)
+                    callback(msg_dict)
             except Exception as e:
                 callback({"status": "error", "error": str(e)})
             finally:

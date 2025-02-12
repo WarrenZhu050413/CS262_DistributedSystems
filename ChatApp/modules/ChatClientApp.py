@@ -10,7 +10,7 @@ class ChatClientApp:
         """
         self.root = root
         self.client = client  # The new ChatClient instance
-        self.root.title("Length-Prefixed JSON Client")
+        self.root.title("Wire Protocol Client")
 
         # For convenience, use StringVars to hold input field values
         self.action_var: tk.StringVar = tk.StringVar()
@@ -161,19 +161,19 @@ class ChatClientApp:
             return
 
         try:
-            resp_json: Dict[str, Any] = self.client.send_request(
+            resp_dict: Dict[str, Any] = self.client.send_request(
                 action, from_user, to_user, password, msg
             )
-            self.response_label.config(text=f"Server responded with JSON:\n{resp_json}")
+            self.response_label.config(text=f"Server responded with dict:\n{resp_dict}")
             # If the action is "message", display the sent message in the message box.
             if action == "message":
                 self._append_incoming_messages(f"To {to_user}: {msg}\n")
                 # Optionally, clear the message entry field after sending.
                 self.message_var.set("")
             # REAL-TIME MOD: After a successful login, start the persistent listener.
-            if action == "login" and "session_id" in resp_json:
+            if action == "login" and "session_id" in resp_dict:
                 # Retrieve the unread message count (default to 0 if not provided)
-                unread = resp_json.get("unread_messages", 0)
+                unread = resp_dict.get("unread_messages", 0)
                 # Update the response label to show the unread messages count
                 self.response_label.config(text=f"Login successful. You have {unread} unread messages.")
                 self.client.start_listener(from_user, self.handle_incoming_message)
@@ -199,7 +199,7 @@ class ChatClientApp:
         try:
             # We assume the server has an action "list_accounts" that takes
             # the pattern in the 'message' field, for instance.
-            resp_json = self.client.send_request(
+            resp_dict = self.client.send_request(
                 action="list_accounts",
                 from_user=self.from_var.get().strip(),
                 to_user="",  # not used for listing
@@ -207,15 +207,15 @@ class ChatClientApp:
                 msg=pattern
             )
 
-            if resp_json.get("status") == "ok":
+            if resp_dict.get("status") == "ok":
                 # The server might return {"status": "ok", "accounts": [...]}
-                self.search_results = resp_json.get("accounts", [])
+                self.search_results = resp_dict.get("accounts", [])
                 self.search_results_index = 0
                 self.update_search_results_display()
             else:
                 # Some error from the server
                 self.search_results_label.config(
-                    text=f"Error from server: {resp_json.get('error', 'Unknown error')}"
+                    text=f"Error from server: {resp_dict.get('error', 'Unknown error')}"
                 )
         except Exception as e:
             self.search_results_label.config(text=f"Search failed: {str(e)}")
@@ -272,7 +272,7 @@ class ChatClientApp:
         try:
             # We assume the server has an action "read_messages" that uses
             # 'message' field or something to indicate how many to fetch.
-            resp_json = self.client.send_request(
+            resp_dict = self.client.send_request(
                 action="read_messages",
                 from_user=self.from_var.get().strip(),
                 to_user="",  # not used for reading
@@ -280,9 +280,9 @@ class ChatClientApp:
                 msg=str(count_val)  # Send the count as the message payload
             )
 
-            if resp_json.get("status") == "ok":
+            if resp_dict.get("status") == "ok":
                 # The server might return {"status": "ok", "messages": [...]}
-                msgs = resp_json.get("messages", [])
+                msgs = resp_dict.get("messages", [])
                 if msgs:
                     for m in msgs:
                         msg_id = m.get("id", "N/A")
@@ -292,7 +292,7 @@ class ChatClientApp:
                 else:
                     self._append_incoming_messages("No new messages.\n")
             else:
-                error_text = resp_json.get("error", "Unknown error")
+                error_text = resp_dict.get("error", "Unknown error")
                 self._append_incoming_messages(f"Error fetching messages: {error_text}\n")
         except Exception as e:
             self._append_incoming_messages(f"Failed to fetch messages: {str(e)}\n")
@@ -310,19 +310,19 @@ class ChatClientApp:
             return
 
         try:
-            resp_json: Dict[str, Any] = self.client.send_request(
+            resp_dict: Dict[str, Any] = self.client.send_request(
                 action="delete_messages",
                 from_user=self.from_var.get().strip(),
                 to_user="",
                 password=self.password_var.get().strip(),
                 msg=msg_ids_str
             )
-            if resp_json.get("status") == "ok":
-                self.response_label.config(text=resp_json.get("message", "Messages deleted."))
+            if resp_dict.get("status") == "ok":
+                self.response_label.config(text=resp_dict.get("message", "Messages deleted."))
                 # Refresh the incoming messages text widget with the remaining messages.
                 self.incoming_messages_text.config(state="normal")
                 self.incoming_messages_text.delete(1.0, tk.END)
-                messages = resp_json.get("messages", [])
+                messages = resp_dict.get("messages", [])
                 if messages:
                     for m in messages:
                         msg_id = m.get("id", "N/A")
@@ -335,7 +335,7 @@ class ChatClientApp:
                 # Clear the delete message IDs entry.
                 self.delete_ids_var.set("")
             else:
-                self.response_label.config(text=f"Error deleting messages: {resp_json.get('error')}")
+                self.response_label.config(text=f"Error deleting messages: {resp_dict.get('error')}")
         except Exception as e:
             self.response_label.config(text=f"Error: {str(e)}")
 
@@ -351,11 +351,11 @@ class ChatClientApp:
             return
 
         try:
-            resp_json: Dict[str, Any] = self.client.delete_account(username)
-            if resp_json.get("status") == "ok":
+            resp_dict: Dict[str, Any] = self.client.delete_account(username)
+            if resp_dict.get("status") == "ok":
                 self.response_label.config(text="Account has been deleted, close app to finish.")
             else:
-                error = resp_json.get("error", "Unknown error")
+                error = resp_dict.get("error", "Unknown error")
                 self.response_label.config(text=f"Error deleting account: {error}")
         except Exception as e:
             self.response_label.config(text=f"Error: {str(e)}")
@@ -374,18 +374,18 @@ class ChatClientApp:
     # ------------------------------
     # NEW: Method to handle real-time incoming messages
     # ------------------------------
-    def handle_incoming_message(self, msg_json: Dict[str, Any]) -> None:
+    def handle_incoming_message(self, msg_dict: Dict[str, Any]) -> None:
         """
         Callback for messages arriving via the persistent listener connection.
         Since this runs in a background thread, we use self.root.after to update the GUI.
         """
         def update_gui():
-            if msg_json.get("status") == "ok" and "message" in msg_json and "from_user" in msg_json:
-                self._append_incoming_messages(f"From {msg_json['from_user']} [ID: ]: {msg_json['message']}\n")
-                print("printing msg_json")
-                print(msg_json)
-            elif msg_json.get("status") == "error":
-                self._append_incoming_messages(f"Real-time error: {msg_json.get('error')}\n")
+            if msg_dict.get("status") == "ok" and "message" in msg_dict and "from_user" in msg_dict:
+                self._append_incoming_messages(f"From {msg_dict['from_user']} [ID: ]: {msg_dict['message']}\n")
+                print("printing msg_dict")
+                print(msg_dict)
+            elif msg_dict.get("status") == "error":
+                self._append_incoming_messages(f"Real-time error: {msg_dict.get('error')}\n")
             else:
-                self._append_incoming_messages(f"Real-time: {msg_json}\n")
+                self._append_incoming_messages(f"Real-time: {msg_dict}\n")
         self.root.after(0, update_gui)

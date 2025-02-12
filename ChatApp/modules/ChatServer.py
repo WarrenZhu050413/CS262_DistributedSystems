@@ -1,4 +1,3 @@
-import json
 import socket
 import selectors
 import types
@@ -181,12 +180,12 @@ class ChatServer:
 
             try:
                 request_obj = WireMessageJSON.parse_wire_message(raw_msg)
-            except json.JSONDecodeError as e:
-                error_response = {"status": "error", "error": f"JSON parse error: {e}"}
-                self.queue_json_message(data, error_response)
+            except Exception as e:
+                error_response = {"status": "error", "error": f"Dict parse error: {str(e)}"}
+                self.queue_message(data, error_response)
                 continue
 
-            response_obj = self.handle_json_request(request_obj, key)
+            response_obj = self.handle_request(request_obj, key)
             response_bytes = WireMessageJSON.encode_message(response_obj)
             data.outb += response_bytes
 
@@ -219,15 +218,15 @@ class ChatServer:
         self.sel.unregister(tls_conn)
         tls_conn.close()
 
-    # NEW: Define queue_json_message method.
-    def queue_json_message(self, data, response_obj) -> None:
+    # NEW: Define queue_message method.
+    def queue_message(self, data, response_obj) -> None:
         """
         Encode the response object and append it to the connection's outgoing buffer.
         """
         response_bytes = WireMessageJSON.encode_message(response_obj)
         data.outb += response_bytes
 
-    def handle_json_request(self, req, key):
+    def handle_request(self, req, key):
         action = req.get("action", "").lower()
         if action == "register":
             username = req.get("from_user", "")
@@ -262,12 +261,12 @@ class ChatServer:
             session_id = req.get("session_id")
             if not session_id or session_id not in self.active_sessions or self.active_sessions[session_id] != username:
                 result = {"status": "error", "error": "Invalid session for listening"}
-                self.logger.info("Returning from handle_json_request (listen): %s", result)
+                self.logger.info("Returning from handle_request (listen): %s", result)
                 return result
             key.data.username = username
             self.listeners[username] = key.data
             result = {"status": "ok", "message": "Listening for real-time messages"}
-            self.logger.info("Returning from handle_json_request (listen): %s", result)
+            self.logger.info("Returning from handle_request (listen): %s", result)
             return result
     
         elif action == "delete_messages":
@@ -283,7 +282,7 @@ class ChatServer:
 
         else:
             result = {"status": "error", "error": f"Unknown action: {action}"}
-            self.logger.info("Returning from handle_json_request (unknown action): %s", result)
+            self.logger.info("Returning from handle_request (unknown action): %s", result)
             return result
         
 
@@ -407,7 +406,7 @@ class ChatServer:
             listener_data = self.listeners[to_user]
             try:
                 push_obj = {"status": "ok", "from_user": from_user, "message": msg}
-                self.queue_json_message(listener_data, push_obj)
+                self.queue_message(listener_data, push_obj)
                 c.execute("UPDATE messages SET delivered=1 WHERE id=?", (message_id,))
                 conn.commit()
                 conn.close()

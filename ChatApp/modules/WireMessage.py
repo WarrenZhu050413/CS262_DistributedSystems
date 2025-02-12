@@ -9,7 +9,7 @@ class WireMessage(ABC):
         """
         Construct a wire message (as bytes) from the provided parameters.
         
-        This method should encapsulate any encoding (e.g., JSON) and framing (e.g., length prefix)
+        This method should encapsulate any encoding and framing (e.g., length prefix)
         details.
         """
         raise NotImplementedError
