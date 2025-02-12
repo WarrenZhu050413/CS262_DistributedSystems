@@ -272,13 +272,14 @@ Build a basic front-end and back-end first. The aim is that they can exchange me
 ---
 
 ## 11-02-2025 (Implementing the custom binary message protocol)
-- Drafted a simpler approach to our custom binary protocol with fixed fields:  
-  1. `opcode` (1 byte)  
-  2. `username_length` (1 byte), `username` (variable length)  
-  3. `message_length` (2 bytes), `message` (variable length)  
-  4. Optionally: `session_id_length` (1 byte), `session_id` (variable length)  
+- For efficiency, we created our custom binary message protocol, including:  
+  1. Custom serializer, taking the string form of the dictionaries and transforming it into an efficient format with special characters
+  2. Custom deserializer, efficiently parsing through the string, using the special characters to retrieve the fields and values
 - The server reads these fields in sequence to reconstruct the message.  
-- This approach avoids complexities of parsing JSON on the wire.  
+- This approach avoids complexities of parsing JSON on the wire.
+- Since our base JSON implementation passes all information in their byte format, the size of the information passed is the same. However, our custom protocol is more scalable and efficient for larger systems due to its fast encoding and parsing speeds. We compare the efficiency of our protocols below.
+![image]('ChatApp/efficiency.png')
+- As shown in the plot, our custom protocol is more efficient, achieving an average time around 40% faster than our JSON implementation.
 
 ---
 
