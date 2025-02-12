@@ -1,6 +1,6 @@
 # Server configuration
 HOST = "127.0.0.1"
-PORT = 54400
+PORT = 54401
 
 # Database configuration
 DB_FILE = "users.db"
