@@ -5,7 +5,21 @@ from typing import Dict, Any, Optional
 from .WireMessageBinary import WireMessageBinary
 
 class ChatClient:
+    """
+    A client for connecting to and communicating with the chat server.
+    
+    Handles sending requests, managing sessions, and maintaining a persistent 
+    connection for real-time message delivery.
+    """
     def __init__(self, host: str, port: int, cafile: str) -> None:
+        """
+        Initialize a new ChatClient instance.
+
+        Args:
+            host (str): The hostname of the chat server
+            port (int): The port number the server is listening on
+            cafile (str): Path to the SSL certificate authority file
+        """
         self.host: str = host
         self.port: int = port
         self.session_id: Optional[str] = None  # Keep session state here if needed
@@ -22,8 +36,17 @@ class ChatClient:
 
     def send_request(self, action: str, from_user: str, to_user: str, password: str, msg: str) -> Dict[str, Any]:
         """
-        Build the request, send it over the socket, receive the response.
-        Return the parsed response.
+        Send a request to the chat server and return the response.
+
+        Args:
+            action (str): The type of request (e.g. "login", "send_message")
+            from_user (str): The username of the sender
+            to_user (str): The username of the recipient
+            password (str): The user's password (for authentication)
+            msg (str): The message content
+
+        Returns:
+            Dict[str, Any]: The server's response as a dictionary
         """
         wire_message: bytes = WireMessageBinary.make_wire_message(
             action=action,
@@ -51,6 +74,15 @@ class ChatClient:
                 return resp_dict
             
     def delete_account(self, username):
+        """
+        Send a request to delete a user account.
+
+        Args:
+            username (str): The username of the account to delete
+
+        Returns:
+            Dict[str, Any]: The server's response as a dictionary
+        """
         wire_message = WireMessageBinary.make_wire_message(
             action="delete_account",
             from_user=username,
@@ -73,8 +105,14 @@ class ChatClient:
     # ------------------------------
     def start_listener(self, from_user: str, callback) -> None:
         """
-        Establish a persistent connection to the server and send a 'listen' request.
-        Then, in a background thread, continuously read pushed messages and invoke the callback.
+        Start a background thread that listens for real-time messages from the server.
+
+        Creates a persistent connection to receive pushed messages and calls the callback
+        function whenever a new message arrives.
+
+        Args:
+            from_user (str): The username to listen for messages for
+            callback (callable): Function to call with received message dictionaries
         """
         def listen_thread():
             s = None
@@ -125,7 +163,9 @@ class ChatClient:
         self.listener_thread.start()
 
     def stop_listener(self):
+        """
+        Stop the background listener thread and close its connection.
+        """
         if self.listener_socket is not None:
             self.listener_socket.close()
             self.listener_socket = None
-

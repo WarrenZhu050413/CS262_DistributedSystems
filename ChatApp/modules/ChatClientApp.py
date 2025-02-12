@@ -4,9 +4,39 @@ from .config import HOST, PORT
 from .ChatClient import ChatClient
 
 class ChatClientApp:
+    """
+    A GUI application for a chat client using tkinter.
+    
+    This class implements a complete chat interface with the following features:
+    - User authentication (login, register, delete account)
+    - Real-time messaging between users
+    - Message management (send, receive, delete messages)
+    - Account search with wildcard pattern matching
+    - Paginated display of search results
+    - Message history with fetch and delete capabilities
+    
+    The GUI is organized into distinct frames for:
+    1. Authentication (username/password)
+    2. Messaging (send messages to other users)
+    3. Account searching (find other users)
+    4. Message management (view/delete messages)
+    
+    The app maintains a persistent connection to the server for real-time
+    message updates while providing a responsive user interface.
+
+    How it works:
+    Uses tkinter to create a GUI.
+    Uses ChatClient to send requests to the server.
+    Uses the handle_incoming_message() method to handle real-time messages from the server.
+    """
+
     def __init__(self, root: tk.Tk, client: ChatClient) -> None:
         """
         Initialize the GUI and keep a reference to the ChatClient instance.
+
+        Args:
+            root (tk.Tk): The root Tkinter window
+            client (ChatClient): Instance of the chat client for server communication
         """
         self.root = root
         self.client = client  # The new ChatClient instance
@@ -37,6 +67,7 @@ class ChatClientApp:
     def build_gui(self) -> None:
         """
         Create and pack all GUI elements: labels, text entries, and buttons.
+        Organizes the interface into frames for authentication, messaging, searching, and message management.
         """
         # ========= User Authentication Frame =========
         auth_frame = tk.LabelFrame(self.root, text="User Authentication")
@@ -125,29 +156,34 @@ class ChatClientApp:
 
     def on_login_click(self) -> None:
         """
-        Set the action to 'login' and invoke the send click handler.
+        Handle login button click event.
+        Sets the action to 'login' and invokes the send click handler.
         """
         self.action_var.set("login")
         self.on_send_click()
 
     def on_register_click(self) -> None:
         """
-        Set the action to 'register' and invoke the send click handler.
+        Handle register button click event.
+        Sets the action to 'register' and invokes the send click handler.
         """
         self.action_var.set("register")
         self.on_send_click()
 
     def on_send_message_click(self) -> None:
         """
-        Set the action to 'message' and invoke the send click handler.
+        Handle send message button click event.
+        Sets the action to 'message' and invokes the send click handler.
         """
         self.action_var.set("message")
         self.on_send_click()
 
     def on_send_click(self) -> None:
         """
-        Retrieve values from the GUI, call the ChatClient to send the request,
-        and display the response.
+        Handle sending requests to the server.
+        Retrieves values from GUI fields, sends request via ChatClient,
+        and displays the response. Also handles special cases for messaging
+        and login actions.
         """
         action: str = self.action_var.get().strip()
         from_user: str = self.from_var.get().strip()
@@ -183,13 +219,11 @@ class ChatClientApp:
         except Exception as e:
             self.response_label.config(text=f"Error: {str(e)}")
 
-    # ===============================
-    # New Methods for Searching Accounts
-    # ===============================
     def on_search_accounts(self) -> None:
         """
-        Sends a request to the server to list accounts matching
-        self.search_pattern_var.
+        Handle account search functionality.
+        Sends a request to the server to find accounts matching the search pattern.
+        Updates the GUI with the search results.
         """
         pattern = self.search_pattern_var.get().strip()
         if not pattern:
@@ -222,7 +256,8 @@ class ChatClientApp:
 
     def update_search_results_display(self) -> None:
         """
-        Display the current 'page' of search results (self.results_per_page).
+        Update the GUI to show the current page of search results.
+        Displays results_per_page number of results starting from the current index.
         """
         if not self.search_results:
             self.search_results_label.config(text="No results.")
@@ -239,24 +274,28 @@ class ChatClientApp:
         self.search_results_label.config(text=f"{page_info}\n{display_text}")
 
     def on_next_page(self) -> None:
-        """Go to the next page of search results, if possible."""
+        """
+        Handle next page button click for search results.
+        Advances to the next page of results if available.
+        """
         if self.search_results_index + self.results_per_page < len(self.search_results):
             self.search_results_index += self.results_per_page
             self.update_search_results_display()
 
     def on_previous_page(self) -> None:
-        """Go to the previous page of search results, if possible."""
+        """
+        Handle previous page button click for search results.
+        Goes back to the previous page of results if available.
+        """
         if self.search_results_index - self.results_per_page >= 0:
             self.search_results_index -= self.results_per_page
             self.update_search_results_display()
 
-    # ===============================
-    # New Methods for Reading Messages
-    # ===============================
     def on_fetch_messages(self) -> None:
         """
-        Sends a request to the server to fetch undelivered messages for 'from_user'.
-        The user can specify how many messages to retrieve at a time.
+        Handle fetching messages from the server.
+        Retrieves the specified number of undelivered messages for the current user
+        and displays them in the messages text box.
         """
         if not self.from_var.get().strip():
             self._append_incoming_messages("Please specify your username in the 'From' field.\n")
@@ -297,11 +336,11 @@ class ChatClientApp:
         except Exception as e:
             self._append_incoming_messages(f"Failed to fetch messages: {str(e)}\n")
 
-    # TODO: make sure user is authorized to delete this message (aka either the sender or recipient)
     def on_delete_messages(self) -> None:
         """
-        Send a request to delete messages with the specified IDs.
-        After deletion, refresh the incoming messages display with the updated list.
+        Handle message deletion functionality.
+        Sends a request to delete messages with specified IDs and updates
+        the message display accordingly.
         """
         msg_ids_str = self.delete_ids_var.get().strip()
         print(msg_ids_str)
@@ -339,11 +378,10 @@ class ChatClientApp:
         except Exception as e:
             self.response_label.config(text=f"Error: {str(e)}")
 
-    # TODO: make sure the username matches the authenticated username in order for the deletion to happen
     def on_delete_account(self) -> None:
         """
-        Called when the Delete Account button is pressed.
-        Sends a delete_account request via ChatClient and displays the result.
+        Handle account deletion functionality.
+        Sends a request to delete the current user's account after validation.
         """
         username = self.from_var.get().strip()
         if not username:
@@ -363,6 +401,9 @@ class ChatClientApp:
     def _append_incoming_messages(self, text: str) -> None:
         """
         Helper method to append text to the read-only text box for incoming messages.
+        
+        Args:
+            text (str): The text to append to the messages display
         """
         if not self.incoming_messages_text:
             return
@@ -371,13 +412,13 @@ class ChatClientApp:
         self.incoming_messages_text.config(state="disabled")
         self.incoming_messages_text.see(tk.END)  # auto-scroll
 
-    # ------------------------------
-    # NEW: Method to handle real-time incoming messages
-    # ------------------------------
     def handle_incoming_message(self, msg_dict: Dict[str, Any]) -> None:
         """
-        Callback for messages arriving via the persistent listener connection.
-        Since this runs in a background thread, we use self.root.after to update the GUI.
+        Callback for handling real-time messages from the persistent listener connection.
+        Updates the GUI safely from the background thread using root.after.
+        
+        Args:
+            msg_dict (Dict[str, Any]): Dictionary containing the message data
         """
         def update_gui():
             if msg_dict.get("status") == "ok" and "message" in msg_dict and "from_user" in msg_dict:

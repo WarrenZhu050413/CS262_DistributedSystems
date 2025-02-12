@@ -1,364 +1,312 @@
 # Engineering Notebook
 
 ## 06-02-2025 (Meeting)
-Brainstorming the project together.
+**Brainstorming the project together.**
 
 Decided to:
+1. Start to build the chat app without the GUI before adding the GUI on.  
+2. Use the `selectors` module for async I/O rather than using multi-threading, since this is what was shown in the lectures.  
+3. Use SQLite as the database for persistent storage.
 
-1. Start to build the chat app without the GUI before adding the GUI on
-2. Use selectors module for async-io rather than use mutli-threading since this is what was shown to us in the lectures
-3. Use SQLite as the database for persistent storage
+---
 
 ## 09-02-2025 (Defining the modules of the project)
+Build a basic front-end and back-end first. The aim is that they can exchange messages with each other via TCP.
 
-Build a basic front-end and back end first. The aim is that they can exchange messages with each other via TCP. 
+- **Back-end**: Base it on the `countAndTrans.py` example on Canvas.  
+- **Front-end**: Use Flask and `tkinter` for the GUI (as recommended on Ed).  
+- **Dependencies**: Use `environment.yaml` to define the dependencies for the project. We chose `python=3.11` because it is faster.
 
-Build the backend from the code `countAndTrans.py` on canvas. Build the front-end using Flask. Use `tkinter` for the UI (recommended on Ed).
+---
 
-Use an environment.yaml file to define the dependencies for the project. Use python=3.11 because it is faster.
+## 10-02-2025 (Beginning to Build)
+- **Minimum Message Transfer**  
+  - First support JSON only.  
+  - The client GUI is minimalistic: one text entry box and a Send button. It sends JSON.  
+  - We use the native Python `json` library to parse and build JSON messages.
 
-## 10-02-2025 （Beginning to Build)
+- **Commands Implemented**  
+  1. **Register**  
+     ```json
+     {
+       "action": "register",
+       "from": "bob",
+       "password": "mypassword"
+     }
+     ```
+     - Test: Do it twice to see whether we get "Username already exists" error.  
 
-Starting the project, building up minimum message transfer functionality. First support JSON only. The client GUI is minimalistic, just a text entry box and a send button, and needs to write in JSON. **Later can help users format their messages into JSON**. We use the native JSON library of python to parse the JSON messages into a dictionary.
+  2. **Login**  
+     ```json
+     {
+       "action": "login",
+       "from": "bob",
+       "password": "mypassword"
+     }
+     ```
 
-We will implement three commands: registration, login, and message. Each command will be a JSON object with the following fields, prefixed with a 4 byte length field:
+  3. **Message**  
+     ```json
+     {
+       "action": "message",
+       "from": "bob",
+       "to": "alice",
+       "message": "Hello, Alice!"
+     }
+     ```
 
-1. **Register**  
-   ```json
-   {
-     "action": "register",
-     "from": "bob",
-     "password": "mypassword"
-   }
-   ```
-Test: Do it twice to see whether get "Username already exists" error.
-
-2. **Login**  
-   ```json
-   {
-     "action": "login",
-     "from": "bob",
-     "password": "mypassword"
-   }
-   ```
-
-3. **Message**  
-   ```json
-   {
-     "action": "message",
-     "from": "bob",
-     "to": "alice",
-     "message": "Hello, Alice!"
-   }
-   ```
-
-The server will respond with a **JSON** object:
-
-- Successful registration:
-  ```json
-  {
-    "status": "ok",
-    "message": "Registration successful"
-  }
-  ```
-- Registration error message:
-   - Username already exists
-   ```json
-   {
+- **Server Response**  
+  - **Successful registration**  
+    ```json
+    {
+      "status": "ok",
+      "message": "Registration successful"
+    }
+    ```
+  - **Registration error**  
+    - Username already exists  
+      ```json
+      {
+        "status": "error",
+        "error": "Username already exists"
+      }
+      ```
+    - Password is too long  
+      ```json
+      {
+        "status": "error",
+        "error": "Password is too long"
+      }
+      ```
+  - **Login response (with session)**  
+    ```json
+    {
+      "status": "ok",
+      "session_id": "abcdef123456..."
+    }
+    ```
+  - **Login error message**  
+    ```json
+    {
       "status": "error",
-      "error": "Username already exists"
-   }
-   ```
-  - Password is too long
-   ```json
-   {
-      "status": "error",
-      "error": "Password is too long"
-   }
-   ```
-- Login response (with session):
-  ```json
-  {
-    "status": "ok",
-    "session_id": "abcdef123456..."
-  }
-  ```
-- Login error message:
-  ```json
-  {
-    "status": "error",
-    "error": "Invalid username or password"
-  }
-  ```
+      "error": "Invalid username or password"
+    }
+    ```
 
+- **Client Registration**  
+  - Client registration is on a separate `register` GUI webpage.  
+  - Checks password length < 256 chars, then checks for duplicate username in SQLite.  
+  - If successful, inserts `(username, password)` into the SQLite `users` table.  
+  - On success, user is directed to the main messaging page, with a “logged in” status.
 
+- **Security**:  
+  - We plan to use basic security by hashing the password with `bcrypt` or similar.  
+  - The project is not focusing on advanced security, but we will use TLS for transport.
 
-First, support client registration.
-
-- Client registration should happen in a separate register GUI webpage. 
-The registration includes a username and a password. The password should be first be checked to be shorter than $2^8 = 256$ characters, then the username should be checked against duplication in the SQLite database (using a SQLite query, perhaps using the python built-in functionality for SQLite and the python-specific SQLite language) on the server once the server receives it. If there is no username duplication and the password is short enough, then the username and password pair is logged in a SQLite database with two columns, username and password. At last, redirect the user into a page that supports message passing, with a status indicating that the user is logged in. 
-
-The logging in functionality should support sessions for continuous authentication, and the password passing should have security by using hashes, but we don't need too much more security at this point.
+---
 
 ## 10-02-2025 (Security)
-
-Adding extra security to the password login/registration process. Decide to use TLS handshake for connection. Generated a self-signed certificate for the server.
-
-Use non-blocking handshake to avoid blocking the main thread and improve performance.
-
-```
-openssl req -newkey rsa:2048 -nodes -x509 -days 365 \
-  -keyout server.key \
-  -out server.crt
-```
-
-We should write our code to be as modular as possible. The JSON message to be passed.
-
-## 10-02-2025 Debugging: Testing a basic login/registration process, active session management
-I first registered alice, and then bob.
-
-```json
-{"action": "register", "from": "alice", "password": "mypassword"}
-{"action": "register", "from": "bob", "password": "mypassword"}
-```
-
-Then I checked the database file `users.db` to see whether the registration is successful.
-```json
-❯ sqlite3 users.db .dump
-PRAGMA foreign_keys=OFF;
-BEGIN TRANSACTION;
-CREATE TABLE users (
-            username TEXT PRIMARY KEY,
-            password TEXT
-        );
-INSERT INTO users VALUES('alice','$2b$12$/MpJ7KaB7QdJ0sdz7bAdGetr/EELX9g14CaIhxZ10CmpZACBF371a');
-INSERT INTO users VALUES('bob','$2b$12$9aHMm0a2nP33jLLt7uoHCeSaACZCG46JIICZOO70j8pizeJ8keCrm');
-COMMIT;
-```
-
-Then I logged in bob and sent a message to alice.
-
-```json
-{"action": "login", "from": "bob", "password": "mypassword"}
-```
-Server responded with JSON {"status": "ok", "session_id": "f1c191a014483..."}
-
-But the message is not delivered.
-```json
-{"action": "message", "from": "bob", "to": "alice", "message": "Hello, Alice!"}
-```
-Server responded with JSON {"status": "error", "error": "Invalid session"}
-
-My hypothesis is that somehow the session_id is not being logged.
-
-Will debug this by adding logging to the code.
-
-1. **Register**  
-   ```json
-   {
-     "action": "register",
-     "from": "bob",
-     "password": "mypassword"
-   }
-   ```
-Test: Do it twice to see whether get "Username already exists" error.
-
-1. **Login**  
-   ```json
-   {
-     "action": "login",
-     "from": "bob",
-     "password": "mypassword"
-   }
-   ```
-
-2. **Message**  
-   ```json
-   {
-     "action": "message",
-     "from": "bob",
-     "to": "alice",
-     "message": "Hello, Alice!"
-   }
-   ```
-
-Found out the reason is that we forgot to add the session_id to the message. However, this is not very user friendly, so will configure the client to remember the session_id after logging in and append the session_id to the message.
-
-## 10-02-2025 Changing the GUI to automatically prepare the client-side information into the correct wire protocol format
-The gui before required the client to type the message into the correct format (e.g. type JSON). This is error-prone. A better design is to parse the user input into the correct wire protocol format automatically, with multiple input text boxes for different fields in the wire protocol.
-
-When done this, found that the GUI code becomes harder to maintain. Therefore writing it as a class-based GUI.
-
-This ended up being cleaner. Also passed the session_id to the server automatically, and now can send messages to the server.
-
-## 10-02-2025 Refactor the server code to be class-based
-
-Finished refactoring. Put previous functins into the ChatServer class.
-
-## 10-02-2025 Add automatic testing
-
-
-## 10-02-2025 Building receive functionality into the app
-
-Currently, when we send a message, we only have it printed out in the terminal `[MESSAGE] bob -> alice: hi!`, but not actually sent to the other user. We now need to build the logic to do so.
-
-In order to do so, we will experiment with the following protocol:
-
-```
-When user_from -> user_to: message:
-   check_user_from_valie()
-   If user_to in active_sessions.values():
-      push_message_to_user_to()
-   If user_to not in active_sessions.values():
-      save_message_to_user_to()
-
-Further, we need to augment the handle_login() function:
-
-handle_login():
-
-```
-
-## 10-02-2025 Improve Security
-Realized that the security certificate was pushed to Github. Regenerated the certificate and put the `./security` folder into `.gitignore`.
-
-## 10-02-2025 Implement Separation of Concerns in the client code
-
-Refactor the client code to separate out the GUI code from the wire protocol code. Implemented the class ChatClient for the wire protocol code. Then implemented the class ChatClientApp (child class of ChatClient) for the GUI code.
-
-## 10-02-2025 Implement type annotations
-
-As the code grows, it is becoming more and more difficult to reason about the code. Therefore, implement type annotations to help with the code maintenance.
-
-## 10-02-2025 Develop more robust message delivery system
-
-With most of the funamental architecture in place, we made our message delivery more robust with the following changes.
-
-1. Allow users to use wildcard patterns to search for existing users to send messages to.
-2. Confirmed that the recipient username exists. If not, then we throw an appropriate error to notify the user.
-3. Cleaned up GUI so that the text fields are more streamlined with Login, Register, and Send Message buttons
-4. Added multi-threading so that real-time messaging is enabled when both sender and recipient are online. Messages sent when the recipient is offline are stored to be fetched by the recipient when they log back in.
-5. Display messages sent by a user in addition to messages that they receive.
-
-## 11-02-2025 Login for only 1 user per connection
-
-Previous code allows one connection to login multiple times. Now we modify the code so that one connection can only login once.
-
-## 11-02-2025 Preparing to migrate away from JSON
-
-Goal: Make the wire protocol transparent to the developer, so that they can still design using the more human readable JSON format, but the data being transferred is in a custom binary format.
-
-We refactored the code more so that the wire protocol is separated from the GUI and client code.
-
-Refactor the code to use a new WireMessage class that supports the following API:
-
-Input: action, from_user, to_user, password, msg, session_id
-
-Functions: WireMessage.make_wire_message(action, from_user, to_user, password, msg, session_id) -> wire_message: bytes
-           WireMessage.parse_wire_message(wire_message) -> JSON object
-           WireMessage.read_wire_message(socket) -> wire_message: bytes
-
-Note: Parse_wire and read_wire message are separated out. The read_wire message returns the bytes object, and the parse_wire message parses the bytes object into a JSON object.
-
-The client side code is rewritten using WireProtocolJSON, same with the server side code
-
-## 11-02-2025 Changing the import structure and config file to make it run like a package
-
-Now, every module import is relative to the ChatApp folder.
-
-```
-python -m ChatApp.server 
-python -m ChatApp.client
-```
-
-## 11-02-2025 Implementing More Unit Tests
-
-Implemented more unit tests to test the message delivery system.
-
-Found the following error:
-```
-======================================================================
-FAIL: test_read_messages (__main__.TestChatApp.test_read_messages)
-Test that reading messages returns undelivered messages and marks them as delivered.
-----------------------------------------------------------------------
-Traceback (most recent call last):
-  File "/Users/wz/Desktop/CS2620/CS2620_Code/CS262_DistributedSystems/ChatApp/testchat.py", line 306, in test_read_messages
-    self.assertEqual(sent_msg, msg_obj.get("content"), "Mismatch in message content")
-AssertionError: 'Hello' != ''
-- Hello
-+ 
- : Mismatch in message content
-```
-
-Hypothesis: Message is not being stored in the database.
-
-JSON specific functions are:
-
-```server.py
-self.queue_json_message()
-self.handle_json_request()
-```
-
-```client.py
-self.make_json_wire_message()
-self.send_request()
-self._read_response()
-self._parse_response()
-```
-
-ChatClientApp.on_send_click() -> ChatClient.send_request() -> ChatClient._read_response() -> ChatClient._parse_response()
-
-Perhaps the most convenient way to create our custom wire protocol is to it in custom binary format, and then when receiving it, 
-
-
-
-### Wire Protocol
-1. Different types of messages that we need to support
-
-**White Space Handling?**
-
-Client to server:
-- {action: send, to: user_name, message: message_content}
-
-server to client:
-= {action: message, from: user_name, message: message_content}
-
-JSON Wire Protocol: 
-{"action": "send", "to"}
-
-Also, since sending via TCP, needs to delimit each JSON message. Maybe through 
-
-Custom Binary Protocol: 
-1. Needs to solve field delimination
-   1. Should we prefix the length or have a special character delimiting the field?
-   2. Prefixing the length may be better for cleaner code and faster processing
-   3. opcode | username_length | username | message_length | message
-
-### System Architecture
-
-#### Server
-1. Use Flask? (Easy to use, light-weight, we have experience)
-2. Handle concurrent connections (in the handout code)
-3. Create users
-   1. Log user data in SQLite
-      1. username uniqueness
-      2. Authorization
-4. Message handling
-   1. Server accepts chat message from user via `socket`
-   2. Server saves it to SQLite database
-   3. Server checks whether the recipient is online
-   4. If the recipient is online
-
-
-1: Creating an account. The user supplies a unique (login) name. If there is already an account with that name, the user is prompted for the password. If the name is not being used, the user is prompted to supply a password. The password should not be passed as plaintext. 
-
-2: Log in to an account. Using a login name and password, log into an account. An incorrect login or bad user name should display an error. A successful login should display the number of unread messages.
-
-3: List accounts, or a subset of accounts that fit a text wildcard pattern. If there are more accounts than can comfortably be displayed, allow iterating through the accounts.
-
-1. Send a message to a recipient. If the recipient is logged in, deliver immediately; if not the message should be stored until the recipient logs in and requests to see the message.
-
-5: Read messages. If there are undelivered messages, display those messages. The user should be able to specify the number of messages they want delivered at any single time.
-
-6. Delete a message or set of messages. Once deleted messages are gone.
-
-7. Delete an account. You will need to specify the semantics of deleting an account that contains unread messages.
+- Added extra security to the password login/registration process.  
+- Decided to use a TLS handshake for the connection. We generated a self-signed certificate for the server:
+  ```bash
+  openssl req -newkey rsa:2048 -nodes -x509 -days 365 \
+    -keyout server.key \
+    -out server.crt
+  ```
+- We use non-blocking handshake to avoid blocking the main thread and improve performance.
+
+---
+
+## 10-02-2025 (Debugging: Testing basic login/registration process with active session management)
+- Registered `alice` and `bob`:
+  ```json
+  {"action": "register", "from": "alice", "password": "mypassword"}
+  {"action": "register", "from": "bob", "password": "mypassword"}
+  ```
+- Checked `users.db` with `sqlite3 users.db .dump`:
+  ```sql
+  CREATE TABLE users (
+              username TEXT PRIMARY KEY,
+              password TEXT
+          );
+  INSERT INTO users VALUES('alice','$2b$12$/MpJ7KaB7QdJ0sdz...');
+  INSERT INTO users VALUES('bob','$2b$12$9aHMm0a2nP3...');
+  ```
+- Then logged in `bob`:
+  ```json
+  {"action": "login", "from": "bob", "password": "mypassword"}
+  ```
+  - Got response with `"session_id": "f1c191a014483..."`.
+
+- **Message Problem**:  
+  ```json
+  {"action": "message", "from": "bob", "to": "alice", "message": "Hello, Alice!"}
+  ```
+  - The server responded with `{"status": "error", "error": "Invalid session"}`.  
+  - **Root Cause**: We forgot to include `session_id` in the outgoing message.  
+
+- **Fix**: The client now stores the session_id from the login response and automatically appends it to any subsequent message requests.
+
+---
+
+## 10-02-2025 (Changing the GUI to auto-generate wire protocol messages)
+- Previously, the user had to type JSON by hand, which was error-prone.  
+- Now the GUI has multiple input fields (username, password, recipient, message) and automatically assembles them into the correct JSON wire protocol.  
+- This approach is more user-friendly.  
+- **Implementation**: Wrote a class-based GUI for better organization.  
+
+---
+
+## 10-02-2025 (Refactor the server code to be class-based)
+- Moved server functions into a `ChatServer` class.  
+- Separated command handling logic (`handle_register`, `handle_login`, `handle_message`, etc.) for clarity.
+
+---
+
+## 10-02-2025 (Add automatic testing)
+- Started adding unit tests for registration, login, message sending, and session management.  
+- Ensuring that repeated registrations or invalid logins produce correct error responses.
+
+---
+
+## 10-02-2025 (Building receive functionality into the app)
+- Currently, when a message is sent, the server prints:
+  ```
+  [MESSAGE] bob -> alice: hi!
+  ```
+  But the receiving user does not get a real-time notification in their GUI.  
+- Plan for real-time delivery if recipient is online; if offline, message is saved to be fetched later.
+
+---
+
+## 10-02-2025 (Improve Security)
+- Noticed that the security certificates were pushed to GitHub by accident.  
+- **Action**: Regenerated certificates, placed them in `./security`, and added them to `.gitignore`.
+
+---
+
+## 10-02-2025 (Implement Separation of Concerns in the client code)
+- Refactored client code to separate the GUI from wire protocol logic:  
+  - `ChatClient` handles network I/O.  
+  - `ChatClientApp` handles the GUI and user interaction.
+
+---
+
+## 10-02-2025 (Implement type annotations)
+- Added type hints throughout the code to improve readability and maintainability.
+
+---
+
+## 10-02-2025 (Develop more robust message delivery system)
+1. Allow wildcard patterns to search for existing users.  
+2. Validate that the recipient username exists; if not, return an error.  
+3. Simplify the GUI layout with separate buttons for **Login**, **Register**, **Send Message**.  
+4. Added **multi-threading** to support real-time messaging when both sender and recipient are online. Offline messages are stored and delivered later.  
+5. Display sent messages alongside received messages in the client’s GUI.
+
+---
+
+## 11-02-2025 (Restricting each connection to a single login)
+- Changed the code so that once a user logs in on a connection, it cannot be used for a second login.  
+- This avoids confusion and potential security issues.
+
+---
+
+## 11-02-2025 (Preparing to migrate away from JSON)
+- Goal: keep a human-readable design approach but move to a custom binary format for the wire protocol (more compact, faster).  
+- Implemented a `WireMessage` class with these functions:  
+  - `make_wire_message(action, from_user, to_user, password, msg, session_id) -> bytes`  
+  - `parse_wire_message(wire_message: bytes) -> dict`  
+  - `read_wire_message(socket) -> bytes`  
+- Currently `WireProtocolJSON` is used, but we plan to implement `WireProtocolBinary` in the same architecture.
+
+---
+
+## 11-02-2025 (Changing import structure to run like a package)
+- Reorganized the repository so each module can be imported in a more standard way:
+  ```
+  python -m ChatApp.server
+  python -m ChatApp.client
+  ```
+- Ensures consistent imports and easier distribution.
+
+---
+
+## 11-02-2025 (Implementing More Unit Tests)
+- Testing the message delivery system, including offline/online states, reading stored messages, etc.  
+- **Found an error** in a test:
+  ```
+  FAIL: test_read_messages
+    ...
+    AssertionError: 'Hello' != ''
+  ```
+  - **Root Cause**: The message was not stored in the database or not retrieved properly.  
+  - Traced it to our JSON serialization logic and fixed it in `self.handle_json_request()`.
+
+---
+
+## 11-02-2025 (Adding Delete Message Functionality)
+- Implemented a new “delete” action that removes one or more messages from the server-side storage.  
+  - If the user selects message IDs `[2, 3, 4]`, the server will remove them from the DB.  
+  - The server returns a success or error JSON (or wire-protocol) response.
+
+---
+
+## 11-02-2025 (Delete User Functionality)
+- Implemented a new “delete user” action.  
+  - Deletes the user’s entry from `users.db`.  
+  - Removes any stored messages for that user.  
+  - Terminates the user’s active session if it exists.
+
+---
+
+## 11-02-2025 (Showing number of unread messages)
+- Upon successful login, the server checks the database for unread messages for the user.  
+- The server returns the count, and the client GUI displays it.
+
+---
+
+## 11-02-2025 (Debugging multi-user environment)
+- Verified that specifying the correct network interface (e.g., `HOST = <your_IP_address>`) is essential for testing with multiple people.
+
+---
+
+## 11-02-2025 (Implementing the custom binary message protocol)
+- Drafted a simpler approach to our custom binary protocol with fixed fields:  
+  1. `opcode` (1 byte)  
+  2. `username_length` (1 byte), `username` (variable length)  
+  3. `message_length` (2 bytes), `message` (variable length)  
+  4. Optionally: `session_id_length` (1 byte), `session_id` (variable length)  
+- The server reads these fields in sequence to reconstruct the message.  
+- This approach avoids complexities of parsing JSON on the wire.  
+
+---
+
+## 12-02-2025 (Performance and Scaling Discussion)
+1. **Performance Testing**  
+   - Will run load tests to see how the server performs under multiple concurrent logins and message sends.  
+   - Plan to use a tool like `locust` or a custom Python script with multiple threads/async tasks.  
+2. **Scaling**  
+   - If we need to support many users, consider optimizing the SQLite usage or switching to a more robust DB like PostgreSQL.  
+   - The chosen concurrency model with `selectors` should scale moderately well, but we may explore `asyncio` if needed.  
+3. **Next Steps**  
+   - Finalize the custom binary protocol implementation for all actions (login, register, message, delete, etc.).  
+   - Provide a configuration setting so the client and server can switch between JSON or binary protocols easily.  
+   - Expand the test suite to cover all new features (delete user, message deletion, etc.).  
+
+---
+
+## 12-02-2025 (Planned Features and Future Work)
+1. **Group Chat**  
+   - Extend the `to` field to accept a list of recipients or a group name.  
+   - Server would then handle sending to multiple recipients at once.  
+2. **Attachments or File Transfers**  
+   - Potentially store small files in the database or have a separate file server; we need to define size limits.  
+3. **Message Read Receipts**  
+   - Add a status to each message row in the database: `delivered`, `read`, etc.  
+   - Update once the client confirms reading.  
+4. **Refine Security**  
+   - Use more robust hashing (`bcrypt` with stronger parameters or `argon2`).  
+   - Explore OAUTH / JWT for session management if scaling up.  
+5. **Docker Containerization**  
+   - Make the deployment simpler by packaging the server (and possibly the client) into a Docker image.  

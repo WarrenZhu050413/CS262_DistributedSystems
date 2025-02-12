@@ -12,13 +12,60 @@ from .WireMessageBinary import WireMessageBinary
 
 class ChatServer:
     """
-    A class-based refactoring of the chat server.
-    Encapsulates the SSL, socket, and message-handling logic.
+    A secure chat server implementation that handles multiple concurrent client connections.
+    
+    This server provides:
+    - TLS encryption for all communications
+    - User registration and authentication
+    - Real-time message delivery when recipients are online
+    - Message storage and delayed delivery for offline recipients
+    - Account management features like listing users and deleting accounts
+    - Message management including reading and deleting messages
+    
+    The server uses:
+    - Non-blocking sockets with selectors for concurrent I/O
+    - SQLite for persistent storage of users and messages
+    - bcrypt for secure password hashing
+    - Binary wire protocol for efficient message encoding
+    
+    Key Features:
+    - Secure communication using TLS
+    - User authentication and session management
+    - Real-time and offline message delivery
+    - Account and message management
+    - Concurrent client handling
+    - Persistent message storage
+    - Comprehensive logging
+
+    How it works:
+    Uses accept_wrapper() to accept new connections.
+    Uses service_connection() to handle events on client connections.
+    Uses _handle_read() to process incoming data from a client connection.
+    Uses _handle_write() to send queued outgoing data to a client.
+
+    _handle_read() uses handle_request() to route and handle client 
+    requests to different helper functions depending on the user request.
+    
+    Then the server response is encoded using WireMessageBinary and added 
+    to the outgoing buffer to be sent to the client in _handle_write().
     """
 
     def __init__(self, host: str, port: int, db_file: str, cert_file: str, key_file: str, log_file: str) -> None:
         """
         Initialize the chat server with required configuration.
+
+        Args:
+            host (str): The hostname/IP to bind the server to
+            port (int): The port number to listen on
+            db_file (str): Path to SQLite database file
+            cert_file (str): Path to TLS certificate file
+            key_file (str): Path to TLS private key file
+            log_file (str): Path to log file
+
+        The server maintains several key data structures:
+            - active_sessions: Maps session IDs to usernames
+            - listeners: Maps usernames to their real-time connection data
+            - sel: Selector for handling concurrent I/O operations
         """
         self.host: str = host
         self.port: int = port
@@ -43,7 +90,12 @@ class ChatServer:
 
     def setup_logging(self):
         """
-        Configure logging settings.
+        Configure logging settings for the server.
+        
+        Sets up logging with:
+        - DEBUG level logging (can be changed to INFO in production)
+        - Log file output
+        - Timestamp, level and message formatting
         """
         logging_level = logging.DEBUG  # Can also be INFO in production
         logging_file = self.log_file
@@ -57,11 +109,23 @@ class ChatServer:
 
     def setup_database(self):
         """
-        Create a 'users' table in SQLite if it doesn't exist.
-        Columns: username TEXT PRIMARY KEY, password TEXT (hashed password).
+        Initialize the SQLite database schema.
         
-        NOTE: We also create a 'messages' table for storing undelivered messages,
-        and any other tables we need (for example, for listing accounts).
+        Creates two tables if they don't exist:
+        1. users table:
+           - username: TEXT PRIMARY KEY
+           - password: TEXT (bcrypt hashed)
+           
+        2. messages table:
+           - id: INTEGER PRIMARY KEY AUTOINCREMENT
+           - from_user: TEXT NOT NULL
+           - to_user: TEXT NOT NULL  
+           - content: TEXT NOT NULL
+           - delivered: INTEGER NOT NULL DEFAULT 0
+           
+        The delivered flag in messages table:
+        - 0 = message not yet delivered
+        - 1 = message delivered to recipient
         """
         self.logger.info("Setting up database...")
         conn = sqlite3.connect(self.db_file)
@@ -88,7 +152,23 @@ class ChatServer:
 
     def accept_wrapper(self, sock, context):
         """
-        Accept an incoming connection and wrap it in SSL.
+        Accept and configure new client connections.
+        
+        Args:
+            sock: The listening socket
+            context: The SSL context for TLS wrapping
+            
+        This method:
+        1. Accepts the new connection
+        2. Wraps it in TLS 
+        3. Sets it to non-blocking mode
+        4. Registers it with the selector
+        
+        The connection data includes:
+        - addr: Client address
+        - inb: Input buffer
+        - outb: Output buffer
+        - handshake_complete: TLS handshake status
         """
         conn, addr = sock.accept()
         self.logger.info(f"Accepted connection from {addr}")
@@ -111,8 +191,22 @@ class ChatServer:
 
     def service_connection(self, key, mask):
         """
-        Process I/O events on a TLS connection using non-blocking sockets.
-        Uses WireMessageBinary for decoding incoming messages and encoding responses.
+        Handle I/O events on client connections.
+        
+        Args:
+            key: The selector key containing socket and data
+            mask: The event mask indicating read/write events
+            
+        This method:
+        1. Completes TLS handshake if needed
+        2. Handles read events by:
+           - Reading data from socket
+           - Processing complete messages
+           - Generating responses
+        3. Handles write events by:
+           - Sending queued outgoing data
+           
+        Uses WireMessageBinary for message encoding/decoding.
         """
         tls_conn = key.fileobj
         data = key.data
@@ -129,8 +223,17 @@ class ChatServer:
 
     def _complete_handshake(self, tls_conn: socket.socket, data) -> bool:
         """
-        Try to complete the TLS handshake.
-        Returns True if successful, or False if more I/O is needed.
+        Complete the TLS handshake for a connection.
+        
+        Args:
+            tls_conn: The TLS wrapped socket
+            data: Connection data object
+            
+        Returns:
+            bool: True if handshake completed, False if more I/O needed
+            
+        This method handles the non-blocking TLS handshake process,
+        dealing with WantReadError/WantWriteError conditions.
         """
         try:
             tls_conn.do_handshake()
@@ -146,9 +249,21 @@ class ChatServer:
 
     def _handle_read(self, tls_conn: socket.socket, data, key) -> None:
         """
-        Read available data from the socket, extract complete messages using
-        WireMessageBinary.parse_wire_message(), dispatch the request, and queue
-        the encoded response for sending.
+        Process incoming data from a client connection.
+        
+        Args:
+            tls_conn: The TLS wrapped socket
+            data: Connection data object
+            key: Selector key
+            
+        This method:
+        1. Reads raw data from the socket
+        2. Buffers incomplete messages
+        3. Processes complete messages by:
+           - Extracting length-prefixed messages
+           - Parsing binary wire format
+           - Dispatching to appropriate handler
+           - Queueing responses
         """
         try:
             recv_data = tls_conn.recv(4096)  # Read up to 4KB
@@ -185,13 +300,20 @@ class ChatServer:
                 self.queue_message(data, error_response)
                 continue
 
-            response_obj = self.handle_request(request_obj, key)
+            response_obj = self.handle_request(request_obj, key) # This is where the request is handled.
             response_bytes = WireMessageBinary.encode_message(response_obj)
             data.outb += response_bytes
 
     def _handle_write(self, tls_conn: socket.socket, data) -> None:
         """
-        Write queued outgoing data to the socket.
+        Send queued outgoing data to a client.
+        
+        Args:
+            tls_conn: The TLS wrapped socket
+            data: Connection data object
+            
+        Handles non-blocking sends and TLS-specific write conditions.
+        Removes sent data from the outgoing buffer.
         """
         if data.outb:
             try:
@@ -204,8 +326,18 @@ class ChatServer:
 
     def _close_connection(self, tls_conn: socket.socket, data, error_message: str) -> None:
         """
-        Log a message, unregister the socket, remove any persistent listener,
-        and close the connection.
+        Clean up and close a client connection.
+        
+        Args:
+            tls_conn: The TLS wrapped socket to close
+            data: Connection data object
+            error_message: Message to log
+            
+        This method:
+        1. Removes any persistent listener registration
+        2. Logs the closure reason
+        3. Unregisters from the selector
+        4. Closes the socket
         """
         if hasattr(data, 'username'):
             if data.username in self.listeners and self.listeners[data.username] is data:
@@ -218,15 +350,41 @@ class ChatServer:
         self.sel.unregister(tls_conn)
         tls_conn.close()
 
-    # NEW: Define queue_message method.
     def queue_message(self, data, response_obj) -> None:
         """
-        Encode the response object and append it to the connection's outgoing buffer.
+        Queue a response message for sending.
+        
+        Args:
+            data: Connection data object
+            response_obj: Response dictionary to encode and queue
+            
+        Encodes the response using WireMessageBinary and adds
+        it to the connection's outgoing buffer.
         """
         response_bytes = WireMessageBinary.encode_message(response_obj)
         data.outb += response_bytes
 
     def handle_request(self, req, key):
+        """
+        Route and handle client requests.
+        
+        Args:
+            req: The decoded request dictionary
+            key: Selector key for the connection
+            
+        Returns:
+            dict: Response object to send back to client
+            
+        Supports these actions:
+        - register: Create new user account
+        - login: Authenticate and create session
+        - message: Send message to another user
+        - list_accounts: List matching usernames
+        - read_messages: Retrieve undelivered messages
+        - listen: Register for real-time messages
+        - delete_messages: Remove messages
+        - delete_account: Remove user account
+        """
         action = req.get("action", "").lower()
         if action == "register":
             username = req.get("from_user", "")
@@ -288,7 +446,12 @@ class ChatServer:
 
     def get_all_usernames(self):
         """
-        Get all usernames from the database.
+        Retrieve all registered usernames from database.
+        
+        Returns:
+            list: List of all usernames in the database
+            
+        Used primarily for debugging and account listing.
         """
         conn = sqlite3.connect(self.db_file)
         c = conn.cursor()
@@ -298,6 +461,21 @@ class ChatServer:
         return [row[0] for row in rows]
 
     def handle_register(self, username, password):
+        """
+        Register a new user account.
+        
+        Args:
+            username: Desired username
+            password: User's password
+            
+        Returns:
+            dict: Response indicating success or failure
+            
+        The password is hashed using bcrypt before storage.
+        Validates:
+        - Password length
+        - Username uniqueness
+        """
         if len(password) >= 256:
             result = {"status": "error", "error": "Password is too long"}
             self.logger.info("Returning from handle_register: %s", result)
@@ -333,6 +511,22 @@ class ChatServer:
         return result
 
     def handle_login(self, username, password):
+        """
+        Authenticate a user and create a session.
+        
+        Args:
+            username: User's username
+            password: User's password
+            
+        Returns:
+            dict: Response with session ID and unread message count on success
+            
+        On successful login:
+        1. Verifies username/password
+        2. Creates new session ID
+        3. Counts unread messages
+        4. Returns session ID and unread count
+        """
         conn = sqlite3.connect(self.db_file)
         c = conn.cursor()
         c.execute("SELECT password FROM users WHERE username = ?", (username,))
@@ -367,6 +561,25 @@ class ChatServer:
 
 
     def handle_message(self, session_id, from_user, to_user, msg):
+        """
+        Process a message send request.
+        
+        Args:
+            session_id: Sender's session ID
+            from_user: Sender's username
+            to_user: Recipient's username
+            msg: Message content
+            
+        Returns:
+            dict: Response indicating delivery status
+            
+        This method:
+        1. Validates the session
+        2. Verifies recipient exists
+        3. Stores message in database
+        4. Attempts real-time delivery if recipient is listening
+        5. Marks message as delivered if real-time delivery succeeds
+        """
         if not session_id or session_id not in self.active_sessions:
             self.logger.error(f"Invalid session: {session_id} from user: {from_user}")
             result = {"status": "error", "error": "Invalid session"}
@@ -426,6 +639,21 @@ class ChatServer:
             return result
 
     def handle_list_accounts(self, session_id, pattern):
+        """
+        List user accounts matching a pattern.
+        
+        Args:
+            session_id: Requester's session ID
+            pattern: Search pattern (supports * wildcard)
+            
+        Returns:
+            dict: Response with list of matching usernames
+            
+        The pattern:
+        - Empty pattern lists all users
+        - * wildcard converted to SQL LIKE %
+        - Returns usernames matching pattern
+        """
         if not session_id or session_id not in self.active_sessions:
             self.logger.error(f"Invalid session for list_accounts: {session_id}")
             result = {"status": "error", "error": "Invalid session"}
@@ -457,6 +685,23 @@ class ChatServer:
         return result
 
     def handle_read_messages(self, session_id, from_user, count_str):
+        """
+        Retrieve undelivered messages for a user.
+        
+        Args:
+            session_id: User's session ID
+            from_user: Username requesting messages
+            count_str: Number of messages to retrieve
+            
+        Returns:
+            dict: Response with list of messages
+            
+        This method:
+        1. Validates session
+        2. Retrieves undelivered messages
+        3. Marks retrieved messages as delivered
+        4. Returns messages with sender and content
+        """
         if not session_id or session_id not in self.active_sessions:
             self.logger.error(f"Invalid session for read_messages: {session_id}")
             result = {"status": "error", "error": "Invalid session"}
@@ -514,8 +759,21 @@ class ChatServer:
     
     def handle_delete_messages(self, session_id, from_user, msg_ids_str):
         """
-        Delete the messages whose IDs are specified in msg_ids_str (a comma-separated string).
-        Return a response with the remaining undelivered messages for the user.
+        Delete specified messages for a user.
+        
+        Args:
+            session_id: User's session ID
+            from_user: Username requesting deletion
+            msg_ids_str: Comma-separated list of message IDs
+            
+        Returns:
+            dict: Response with remaining messages
+            
+        This method:
+        1. Validates session
+        2. Parses message IDs
+        3. Deletes specified messages
+        4. Returns remaining messages
         """
         # Validate session.
         if not session_id or session_id not in self.active_sessions:
@@ -561,9 +819,21 @@ class ChatServer:
     
     def handle_delete_account(self, username, session_id):
         """
-        Delete the user account from the database along with all messages
-        sent to or sent by this user. Remove the user's active session and any
-        persistent listener.
+        Delete a user account and all associated data.
+        
+        Args:
+            username: Username to delete
+            session_id: User's session ID
+            
+        Returns:
+            dict: Response indicating success/failure
+            
+        This method:
+        1. Validates session
+        2. Deletes user from database
+        3. Deletes all messages to/from user
+        4. Removes session and listener
+        5. Returns success message
         """
         # Validate the session.
         if not session_id or session_id not in self.active_sessions or self.active_sessions[session_id] != username:
