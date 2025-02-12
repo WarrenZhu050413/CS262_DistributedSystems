@@ -381,7 +381,7 @@ class ChatClientApp:
         """
         def update_gui():
             if msg_dict.get("status") == "ok" and "message" in msg_dict and "from_user" in msg_dict:
-                self._append_incoming_messages(f"From {msg_dict['from_user']} [ID: ]: {msg_dict['message']}\n")
+                self._append_incoming_messages(f"From {msg_dict['from_user']}: {msg_dict['message']}\n")
                 print("printing msg_dict")
                 print(msg_dict)
             elif msg_dict.get("status") == "error":

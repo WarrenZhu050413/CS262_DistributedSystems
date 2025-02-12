@@ -540,8 +540,12 @@ class ChatServer:
         conn.commit()
 
         # Retrieve the delivered messages for this user. TODO: may need to tweak this?
-        c.execute("SELECT id, from_user, content FROM messages WHERE to_user=? AND delivered=1 ORDER BY id", (from_user,))
-        # also include messages sent by this user, no matter the delivery status. if needed, sort in order of id.
+        c.execute(
+            "SELECT id, from_user, content FROM messages "
+            "WHERE (to_user = ? AND delivered = 1) OR (from_user = ?) "
+            "ORDER BY id",
+            (from_user, from_user)
+        )
         rows = c.fetchall()
         messages_list = []
         for row in rows:
