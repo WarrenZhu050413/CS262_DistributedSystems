@@ -503,6 +503,8 @@ class ChatServer:
 
         self.running = True
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as lsock:
+            # Enable address reuse to prevent "Address already in use" errors.
+            lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             lsock.bind((self.host, self.port))
             lsock.listen()
             self.logger.debug(f"Listening on {self.host}:{self.port}")

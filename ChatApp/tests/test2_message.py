@@ -97,6 +97,9 @@ class TestChatApp(WireProtocolTest):
         self.assertTrue(found, "Real-time listener did not receive the expected message")
         print(f"Real-time message delivery successful from {sender_username} to {recipient_username}")
 
+        # NEW: Stop the listener to close the SSL socket and avoid ResourceWarning.
+        client_recipient.stop_listener()
+
     def test_offline_message_fetching(self):
         """
         Test that messages delivered to an offline recipient are stored and can be fetched 
