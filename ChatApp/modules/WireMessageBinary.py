@@ -1,7 +1,6 @@
 import socket
 from typing import Optional, Dict, Any
 from .WireMessage import WireMessage
-import ast
 
 c1='<'
 c2='>'
@@ -14,14 +13,13 @@ class WireMessageBinary(WireMessage):
     protocol_version: int = 2
     # Define the replacement mapping (used during serialization).
     _REPLACEMENTS = {
-        '{': c1, 
-        '}': c2,
-        '[': c3,
-        ']': c4, 
-        ',': c5, 
+        '{': c1,  # File Separator (FS)
+        '}': c2,  # Group Separator (GS)
+        '[': c3,  # Record Separator (RS)
+        ']': c4,  # Unit Separator (US)
+        ',': c5,  # Escape (ESC) -- used here for commas
     }
-    
-    _REVERSE_REPLACEMENTS = {v: k for k, v in _REPLACEMENTS.items()}
+    # (The reverse mapping is no longer needed since we parse the control characters directly.)
     
     @classmethod
     def _custom_serialize(cls, message: dict) -> str:
@@ -34,6 +32,97 @@ class WireMessageBinary(WireMessage):
         for char, replacement in cls._REPLACEMENTS.items():
             literal_str = literal_str.replace(char, replacement)
         return literal_str
+
+    @classmethod
+    def _custom_deserialize(cls, payload_str: str) -> dict:
+        """
+        Custom deserializer that directly parses our protocol format without
+        reverting the control characters back to normal punctuation.
+        
+        We expect payload_str to have the following format:
+        
+            FS  <key-value pair> [ESC <key-value pair> ...] GS
+        
+        where:
+          - Within each key–value pair, the key and value (both Python string
+            literals) are separated by a colon (:).
+          - Others are separated by c1-c5
+        
+        Note: This implementation assumes that keys and values are valid Python
+        string literals (e.g. "'some text'" or "\"other text\"") and that colons
+        do not appear unescaped inside the strings.
+        """
+        # Ensure the string starts and ends with the proper markers.
+        print(payload_str)
+        if not (payload_str.startswith(c1) and payload_str.endswith(c2)):
+            raise ValueError("Invalid message format: missing dictionary markers")
+        inner = payload_str[1:-1]  # Remove FS and GS
+        print(inner)
+        if not inner:
+            return {}
+
+        # Split the inner string on our custom comma marker (ESC)
+        pairs = inner.split(c5)
+        print(pairs)
+
+        # # Helper: Check if a quote at position i is escaped.
+        def is_escaped(s: str, i: int) -> bool:
+            backslash_count = 0
+            j = i - 1
+            while j >= 0 and s[j] == '\\':
+                backslash_count += 1
+                j -= 1
+            return (backslash_count % 2) == 1
+
+        # Helper: Parse a Python string literal (e.g. "'text'" or "\"text\"")
+        def parse_python_string(s: Any) -> str:
+            if isinstance(s, int):
+                s = str(s)
+            # if len(s) < 2 or s[0] != s[-1] or s[0] not in ("'", '"'):
+                # print(s[0])
+                # print(s[-1])
+                # raise ValueError("Invalid string literal: " + s)
+            inner_str = s[1:-1]
+            # Decode escape sequences (like \n, \t, \\, etc.)
+            return bytes(inner_str, "utf-8").decode("unicode_escape")
+
+        result = {}
+        # Process each key-value pair.
+        for pair in pairs:
+            pair = pair.strip()
+            print(pair)
+            if not pair:
+                continue
+
+            # Find the colon (:) that separates key and value, ignoring colons inside quotes.
+            sep_index = None
+            in_quote = False
+            current_quote = None
+            for i, char in enumerate(pair):
+                if char in ("'", '"'):
+                    if not in_quote:
+                        in_quote = True
+                        current_quote = char
+                    elif char == current_quote and not is_escaped(pair, i):
+                        in_quote = False
+                        current_quote = None
+                elif char == ':' and not in_quote:
+                    sep_index = i
+                    break
+            if sep_index is None:
+                raise ValueError("Invalid key-value pair, missing colon: " + pair)
+            
+            key_literal = pair[:sep_index].strip()
+            value_literal = pair[sep_index+1:].strip()
+            print(key_literal)
+            print(value_literal)
+            key = parse_python_string(key_literal)
+            print("Key successful")
+            value = parse_python_string(value_literal)
+            print("value successful")
+            result[key] = value
+
+        return result
 
     @classmethod
     def encode_message(cls, message: dict) -> bytes:
@@ -88,29 +177,10 @@ class WireMessageBinary(WireMessage):
     def parse_wire_message(cls, wire_message: bytes) -> Dict[str, Any]:
         """
         Parses the custom wire message (after removing the 4-byte length prefix)
-        back into a dictionary. This is done by decoding the payload as a UTF-8 string,
-        reversing the custom character substitutions, and then using ast.literal_eval
-        to reconstruct the original dictionary. This mechanism supports nested lists
-        (or dictionaries) as values.
+        back into a dictionary.
         """
         try:
             payload_str = wire_message.decode("utf-8")
         except UnicodeDecodeError as e:
             raise ValueError("Unable to decode message payload as UTF-8: " + str(e))
-        data = cls._custom_deserialize(payload_str)
-        return data
-    
-    @classmethod
-    def _custom_deserialize(cls, payload_str: str) -> dict:
-        """
-        Reverses the custom serialization by undoing the character replacements,
-        then uses ast.literal_eval to turn the resulting string back into a dictionary.
-        """
-        # Reverse the replacement: restore the original structural characters.
-        for replacement, char in cls._REVERSE_REPLACEMENTS.items():
-            payload_str = payload_str.replace(replacement, char)
-        try:
-            data = ast.literal_eval(payload_str)
-        except Exception as e:
-            raise ValueError("Failed to parse wire message: " + str(e))
-        return data
+        return cls._custom_deserialize(payload_str)
