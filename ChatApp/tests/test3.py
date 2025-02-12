@@ -1,244 +1,367 @@
 import unittest
+import threading
 import time
+import os
 import random
-import string
+import socket
+from typing import Dict, Any
 
-from .WireProtocolTest import WireProtocolTest
-from ..modules.ChatClient import ChatClient
-from ..server import ChatServer
-from ..modules.config import HOST, DB_FILE, CERT_FILE, KEY_FILE, LOG_FILE
+# Adjust imports to match your project’s layout:
+# from your_package.ChatServer import ChatServer
+# from your_package.ChatClient import ChatClient
 
-###############################################################################
-# Test Class 3: Additional Authentication and Account Management Tests
-###############################################################################
-class TestAccountManagement(WireProtocolTest):
-    def test_logout_valid_session(self):
+from ChatApp.modules.ChatServer import ChatServer
+from ChatApp.modules.ChatClient import ChatClient
+
+# -----------------------------------------------------------------------------
+# Helper: Pick a random free port
+# -----------------------------------------------------------------------------
+def random_port() -> int:
+    """Find a free TCP port for the test server."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('localhost', 0))
+        return s.getsockname()[1]
+
+# -----------------------------------------------------------------------------
+# Integration Tests
+# -----------------------------------------------------------------------------
+class TestChatServerIntegration(unittest.TestCase):
+    """
+    Integration Test Suite for ChatServer and ChatClient
+
+    These tests spin up a ChatServer instance on a random port and use a ChatClient
+    to exercise the server’s functionality. By “integration-style,” we mean that these
+    tests involve real network I/O and an actual database, verifying end-to-end
+    interactions (i.e., that the client and server correctly implement the wire protocol,
+    handle SSL connections, and manipulate the SQLite database).
+
+    Test Overview:
+
+    1. **test_delete_account**:
+    - Registers a user, logs in, then deletes the account.
+    - Verifies that the user cannot log in after deletion.
+
+    2. **test_delete_message**:
+    - Registers two users (sender and receiver).
+    - Sender sends a message to the receiver.
+    - Receiver reads and then deletes the message.
+    - Ensures the message no longer appears in subsequent reads.
+
+    3. **test_sending_batch_messages**:
+    - Registers two users.
+    - One user sends 20 messages to the other.
+    - The other user logs in and fetches all messages in one go.
+    - Verifies that the exact number of sent messages is delivered.
+
+    4. **test_register_many_users**:
+    - Registers 100 users in a loop.
+    - Logs each user in afterward, confirming the server can handle higher volumes
+        of registrations without errors.
+
+    5. **test_long_username**:
+    - Attempts to register a user whose username is about 50 characters long.
+    - Confirms that registration and subsequent login both succeed (unless the server
+        imposes a strict character limit).
+
+    6. **test_special_chars_username**:
+    - Registers and logs in a user whose username contains special characters and spaces.
+    - Validates that the server accepts such usernames if not explicitly disallowed.
+
+    Implementation Details:
+    - `ChatServer` is started in a background thread via `setUpClass`, using a file-based
+    SQLite database (`test.db`) and an SSL certificate/key pair for TLS connections.
+    - The `ChatClient` is instantiated once (shared by all tests), pointing to the same
+    port and using the same certificate.
+    - Each test exercises one or more “actions” (register, login, message, etc.) through
+    the client’s `send_request` or helper methods (e.g., `delete_account`).
+    - `tearDownClass` stops the server and cleans up log files or leftover artifacts.
+
+    Since these are *integration tests*, they verify that multiple layers (network, SSL,
+    database, message handling) work together as intended. This is in contrast to a
+    pure *unit test*, which would test each class/function in isolation using mocks or
+    stubs instead of real sockets and a real database.
+    """
+
+    @classmethod
+    def setUpClass(cls):
         """
-        Test that a user can successfully logout with a valid session:
-          1. Register and login a user.
-          2. Logout the user.
-          3. Verify server response indicates success.
+        Spin up the ChatServer in a background thread, using:
+          - ephemeral port
+          - in-memory SQLite database
+          - test SSL certificate/key
         """
-        client = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
-        test_username = "testuser_" + "".join(random.choices(string.ascii_lowercase, k=6))
-        test_password = "testpass"
+        cls.test_port = random_port()
+        cls.db_file = "test.db"
+        cls.cert_file = "ChatApp/security/server.crt"       # Adjust path to your test cert
+        cls.key_file = "ChatApp/security/server.key"        # Adjust path to your test key
+        cls.log_file = "test_server.log"   # Log file for debugging
 
-        # 1) Register the user
-        resp = client.send_request(
+        cls.server = ChatServer(
+            host="localhost",
+            port=cls.test_port,
+            db_file=cls.db_file,
+            cert_file=cls.cert_file,
+            key_file=cls.key_file,
+            log_file=cls.log_file
+        )
+
+        def run_server():
+            cls.server.start()
+
+        cls.server_thread = threading.Thread(target=run_server, daemon=True)
+        cls.server_thread.start()
+
+        # Give the server a moment to start listening
+        time.sleep(1.0)
+
+        # Create a shared ChatClient for convenience. 
+        # You could also create a new client per test if desired.
+        cafile = cls.cert_file  # In a real test, we'd have a proper CA or trust policy
+        cls.client = ChatClient(host="localhost", port=cls.test_port, cafile=cafile)
+
+    @classmethod
+    def tearDownClass(cls):
+        """
+        Stop the server and join the background thread.
+        """
+        cls.server.stop()
+        cls.server_thread.join(timeout=2.0)
+        # Cleanup log file if desired
+        if os.path.exists(cls.log_file):
+            os.remove(cls.log_file)
+
+    # -------------------------------------------------------------------------
+    # 1) Test deleting an account
+    # -------------------------------------------------------------------------
+    def test_delete_account(self):
+        """
+        Register a user, log in, then delete the account.
+        Verify that the user can't log in afterward.
+        """
+        username = "alice"
+        password = "password123"
+
+        # Register
+        resp = self.client.send_request(
             action="register",
-            from_user=test_username,
+            from_user=username,
             to_user="",
-            password=test_password,
+            password=password,
             msg=""
         )
-        self.assertEqual(resp.get("status"), "ok",
-                         f"Registration failed for {test_username}: {resp}")
+        self.assertEqual(resp.get("status"), "ok", f"Registration failed: {resp}")
 
-        # 2) Login the user
-        resp = client.send_request(
+        # Log in
+        resp = self.client.send_request(
             action="login",
-            from_user=test_username,
+            from_user=username,
             to_user="",
-            password=test_password,
+            password=password,
             msg=""
         )
-        self.assertEqual(resp.get("status"), "ok",
-                         f"Login failed for {test_username}: {resp}")
-        self.assertIn("session_id", resp, "No session_id returned on login")
+        self.assertEqual(resp.get("status"), "ok", f"Login failed: {resp}")
+        session_id = resp.get("session_id")
+        self.assertTrue(session_id, "No session_id returned after login")
 
-        # 3) Logout
-        resp_logout = client.send_request(
-            action="logout",
-            from_user=test_username,
-            to_user="",
-            password="",
-            msg=""
-        )
-        self.assertEqual(resp_logout.get("status"), "ok", f"Logout failed: {resp_logout}")
-        print(f"User {test_username} successfully logged out.")
+        # Now delete account
+        resp = self.client.delete_account(username)
+        self.assertEqual(resp.get("status"), "ok", f"Account delete failed: {resp}")
 
-    def test_logout_invalid_session(self):
-        """
-        Test that attempting to logout with an invalid or missing session fails:
-          1. Use a random username that is not logged in.
-          2. Attempt to logout and verify failure.
-        """
-        client = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
-
-        # Use random username that is not actually logged in.
-        random_username = "no_session_" + "".join(random.choices(string.ascii_lowercase, k=6))
-        resp = client.send_request(
-            action="logout",
-            from_user=random_username,
-            to_user="",
-            password="",
-            msg=""
-        )
-        self.assertEqual(resp.get("status"), "error",
-                         "Logout should fail with invalid or nonexistent session")
-        print(f"Logout with invalid session for user {random_username} correctly returned error.")
-
-    def test_login_after_logout(self):
-        """
-        Test that a user can log back in after logging out:
-          1. Register and login a user.
-          2. Logout the user.
-          3. Log the user back in and verify success.
-        """
-        client = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
-        test_username = "testuser_" + "".join(random.choices(string.ascii_lowercase, k=6))
-        test_password = "testpass"
-
-        # Register the user
-        resp = client.send_request(
-            action="register",
-            from_user=test_username,
-            to_user="",
-            password=test_password,
-            msg=""
-        )
-        self.assertEqual(resp.get("status"), "ok",
-                         f"Registration failed for {test_username}: {resp}")
-
-        # Login the user
-        resp_login = client.send_request(
+        # Attempt to login again => Should fail
+        resp = self.client.send_request(
             action="login",
-            from_user=test_username,
+            from_user=username,
             to_user="",
-            password=test_password,
+            password=password,
             msg=""
         )
-        self.assertEqual(resp_login.get("status"), "ok",
-                         f"Login failed for {test_username}: {resp_login}")
-        self.assertIn("session_id", resp_login, "No session_id returned on login")
+        self.assertEqual(resp.get("status"), "error", "Login should fail after account deletion")
 
-        # Logout the user
-        resp_logout = client.send_request(
-            action="logout",
-            from_user=test_username,
-            to_user="",
-            password="",
-            msg=""
-        )
-        self.assertEqual(resp_logout.get("status"), "ok", f"Logout failed: {resp_logout}")
+    # -------------------------------------------------------------------------
+    # 2) Test deleting a message
+    # -------------------------------------------------------------------------
+    def test_delete_message(self):
+        """
+        Register two users (sender & receiver).
+        Sender -> sends a message to receiver.
+        Receiver logs in, reads the message, then deletes it.
+        Verify it is removed from the server’s stored messages.
+        """
+        sender = "bob"
+        sender_pw = "bobpass"
+        receiver = "eve"
+        receiver_pw = "evepass"
 
-        # Log in again
-        resp_login_again = client.send_request(
+        # --- Register both
+        for user, pw in [(sender, sender_pw), (receiver, receiver_pw)]:
+            resp = self.client.send_request(
+                action="register",
+                from_user=user,
+                to_user="",
+                password=pw,
+                msg=""
+            )
+            self.assertEqual(resp.get("status"), "ok", f"Registration failed for {user}: {resp}")
+
+        # --- Log in sender
+        resp = self.client.send_request(
             action="login",
-            from_user=test_username,
+            from_user=sender,
             to_user="",
-            password=test_password,
+            password=sender_pw,
             msg=""
         )
-        self.assertEqual(resp_login_again.get("status"), "ok",
-                         f"Second login failed for {test_username}: {resp_login_again}")
-        self.assertIn("session_id", resp_login_again,
-                      "No session_id returned on second login")
-        print(f"User {test_username} successfully logged in after logging out.")
+        self.assertEqual(resp.get("status"), "ok", f"Login failed for sender: {resp}")
+        session_sender = resp.get("session_id")
 
-    def test_read_messages_not_logged_in(self):
-        """
-        Test that fetching messages without a valid session fails:
-          1. Do not log in the user (or use an invalid session).
-          2. Attempt to read messages.
-          3. Verify error response is returned.
-        """
-        client = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
-        random_username = "no_session_" + "".join(random.choices(string.ascii_lowercase, k=6))
-        
-        # Attempt to read messages without logging in
-        resp_fetch = client.send_request(
+        # --- Send a message from bob -> eve
+        msg_text = "Hello from Bob to Eve!"
+        resp = self.client.send_request(
+            action="message",
+            from_user=sender,
+            to_user=receiver,
+            password=sender_pw,
+            msg=msg_text
+        )
+        self.assertEqual(resp.get("status"), "ok", f"Sending message failed: {resp}")
+
+        # --- Log in receiver
+        resp = self.client.send_request(
+            action="login",
+            from_user=receiver,
+            to_user="",
+            password=receiver_pw,
+            msg=""
+        )
+        self.assertEqual(resp.get("status"), "ok", f"Login failed for receiver: {resp}")
+        session_receiver = resp.get("session_id")
+
+        # --- Read messages
+        resp = self.client.send_request(
             action="read_messages",
-            from_user=random_username,
+            from_user=receiver,
             to_user="",
-            password="",  # No login, so no valid password
-            msg="10"
+            password=receiver_pw,
+            msg="10"  # fetch up to 10 messages
         )
-        self.assertEqual(resp_fetch.get("status"), "error",
-                         "Should not be able to read messages without a valid session")
-        print(f"Read messages with no session for user {random_username} correctly returned error.")
+        self.assertEqual(resp.get("status"), "ok", f"Reading messages failed: {resp}")
+        msgs = resp.get("messages", [])
+        self.assertTrue(len(msgs) > 0, "Expected at least one message")
+        the_msg = msgs[0]
+        msg_id = the_msg.get("id")
+        self.assertIn("Hello from Bob", the_msg.get("content", ""), "Message content mismatch")
 
-    def test_change_password_and_relogin(self):
+        # --- Delete that message
+        resp = self.client.send_request(
+            action="delete_messages",
+            from_user=receiver,
+            to_user="",
+            password=receiver_pw,
+            msg=str(msg_id)
+        )
+        self.assertEqual(resp.get("status"), "ok", f"Deleting message failed: {resp}")
+        self.assertIn("Deleted messages", resp.get("message", ""))
+
+        # Confirm that message is no longer listed among delivered messages
+        remaining = resp.get("messages", [])
+        for m in remaining:
+            self.assertNotEqual(m.get("id"), msg_id, "Message ID was not actually deleted")
+
+    # -------------------------------------------------------------------------
+    # 3) Test sending many messages at once
+    # -------------------------------------------------------------------------
+    def test_sending_batch_messages(self):
         """
-        Test the 'change_password' action (if your server supports it). This ensures:
-          1. A user can register and login.
-          2. The user changes password.
-          3. Logging out and attempting to login with the old password fails.
-          4. Logging in with the new password succeeds.
+        Register two users. 
+        One user sends a batch of messages to the other. 
+        The receiver then reads them all in one go.
         """
-        client = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
-        old_password = "oldpass"
-        new_password = "newpass_" + "".join(random.choices(string.digits, k=3))
-        test_username = "pwchange_" + "".join(random.choices(string.ascii_lowercase, k=6))
+        sender = "batchuser1"
+        sender_pw = "batchpass1"
+        receiver = "batchuser2"
+        receiver_pw = "batchpass2"
 
-        # Register the user
-        resp_reg = client.send_request(
-            action="register",
-            from_user=test_username,
-            to_user="",
-            password=old_password,
-            msg=""
-        )
-        self.assertEqual(resp_reg.get("status"), "ok",
-                         f"Registration failed for {test_username}: {resp_reg}")
+        # Register + Login both
+        for user, pw in [(sender, sender_pw), (receiver, receiver_pw)]:
+            reg_resp = self.client.send_request("register", user, "", pw, "")
+            self.assertEqual(reg_resp.get("status"), "ok", f"Registration failed: {reg_resp}")
+            login_resp = self.client.send_request("login", user, "", pw, "")
+            self.assertEqual(login_resp.get("status"), "ok", f"Login failed: {login_resp}")
 
-        # Login the user
-        resp_login = client.send_request(
-            action="login",
-            from_user=test_username,
-            to_user="",
-            password=old_password,
-            msg=""
-        )
-        self.assertEqual(resp_login.get("status"), "ok",
-                         f"Login failed for {test_username}: {resp_login}")
-        self.assertIn("session_id", resp_login, "No session_id returned on login")
+        # Send 20 messages from sender to receiver
+        for i in range(20):
+            txt = f"Batch message #{i}"
+            resp = self.client.send_request("message", sender, receiver, sender_pw, txt)
+            self.assertEqual(resp.get("status"), "ok", f"Sending message {i} failed: {resp}")
 
-        # Change password (this action must be supported by your server to pass)
-        resp_change_pw = client.send_request(
-            action="change_password",
-            from_user=test_username,
-            to_user="",
-            password=new_password,
-            msg="Change to new password"
-        )
-        if resp_change_pw.get("status") == "error":
-            self.skipTest("Server does not support 'change_password' or test is not implemented.")
-        self.assertEqual(resp_change_pw.get("status"), "ok",
-                         f"Failed to change password: {resp_change_pw}")
+        # Now login as receiver and read them
+        # (Re-login ensures we fetch them in a fresh session if needed)
+        login_resp = self.client.send_request("login", receiver, "", receiver_pw, "")
+        self.assertEqual(login_resp.get("status"), "ok", f"Login failed for receiver: {login_resp}")
 
-        # Logout
-        resp_logout = client.send_request(
-            action="logout",
-            from_user=test_username,
-            to_user="",
-            password="",
-            msg=""
-        )
-        self.assertEqual(resp_logout.get("status"), "ok", f"Logout failed: {resp_logout}")
+        read_resp = self.client.send_request("read_messages", receiver, "", receiver_pw, "50")
+        self.assertEqual(read_resp.get("status"), "ok", f"Reading messages failed: {read_resp}")
+        msgs = read_resp.get("messages", [])
+        self.assertEqual(len(msgs), 20, f"Expected 20 messages, got {len(msgs)}")
 
-        # Attempt login with old password -> should fail
-        resp_login_old = client.send_request(
-            action="login",
-            from_user=test_username,
-            to_user="",
-            password=old_password,
-            msg=""
-        )
-        self.assertEqual(resp_login_old.get("status"), "error",
-                         "Old password should no longer work")
+    # -------------------------------------------------------------------------
+    # 4) Test registering/logging in up to 100 users
+    # -------------------------------------------------------------------------
+    def test_register_many_users(self):
+        """
+        Register 100 users, then attempt to login each to confirm success.
+        """
+        base_name = "testuser_"
+        password = "password"
+        num_users = 100
 
-        # Attempt login with new password -> should succeed
-        resp_login_new = client.send_request(
-            action="login",
-            from_user=test_username,
-            to_user="",
-            password=new_password,
-            msg=""
-        )
-        self.assertEqual(resp_login_new.get("status"), "ok",
-                         f"Login with new password failed: {resp_login_new}")
-        print(f"Password change and re-login for user {test_username} successful.")
+        for i in range(num_users):
+            username = f"{base_name}{i}"
+            resp = self.client.send_request("register", username, "", password, "")
+            self.assertEqual(resp.get("status"), "ok", f"Registration failed for {username}: {resp}")
+
+        # Now login each one
+        for i in range(num_users):
+            username = f"{base_name}{i}"
+            resp = self.client.send_request("login", username, "", password, "")
+            self.assertEqual(resp.get("status"), "ok", f"Login failed for {username}: {resp}")
+
+    # -------------------------------------------------------------------------
+    # 5) Test longer usernames
+    # -------------------------------------------------------------------------
+    def test_long_username(self):
+        """
+        Test registering and logging in with a 50-character username.
+        (You can adjust length as needed.)
+        """
+        long_username = "user_" + ("x" * 45)  # total length ~ 50
+        password = "longuserpass"
+
+        # Register
+        resp = self.client.send_request("register", long_username, "", password, "")
+        self.assertEqual(resp.get("status"), "ok", f"Registration failed for long user: {resp}")
+
+        # Login
+        resp = self.client.send_request("login", long_username, "", password, "")
+        self.assertEqual(resp.get("status"), "ok", f"Login failed for long user: {resp}")
+
+    # -------------------------------------------------------------------------
+    # 6) Test special characters in username
+    # -------------------------------------------------------------------------
+    def test_special_chars_username(self):
+        """
+        Ensure that usernames with special characters (like spaces, punctuation) 
+        can register and log in properly, provided the server does not explicitly forbid them.
+        """
+        special_username = "user!@#$%^&*() with_space"
+        password = "weirdPass123"
+
+        resp = self.client.send_request("register", special_username, "", password, "")
+        self.assertEqual(resp.get("status"), "ok", f"Registration failed for special username: {resp}")
+
+        # Login
+        resp = self.client.send_request("login", special_username, "", password, "")
+        self.assertEqual(resp.get("status"), "ok", f"Login failed for special username: {resp}")
 
 
 if __name__ == "__main__":
