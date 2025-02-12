@@ -56,6 +56,9 @@ class ChatClientApp:
         register_btn = tk.Button(auth_frame, text="Register", command=self.on_register_click)
         register_btn.grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
+        delete_account_btn = tk.Button(auth_frame, text="Delete Account", command=self.on_delete_account)
+        delete_account_btn.grid(row=2, column=2, padx=5, pady=5, sticky="e")
+
         # ========= Messaging Frame =========
         msg_frame = tk.LabelFrame(self.root, text="Send Message")
         msg_frame.pack(fill="both", expand=True, padx=10, pady=5)
@@ -294,6 +297,7 @@ class ChatClientApp:
         except Exception as e:
             self._append_incoming_messages(f"Failed to fetch messages: {str(e)}\n")
 
+    # TODO: make sure user is authorized to delete this message (aka either the sender or recipient)
     def on_delete_messages(self) -> None:
         """
         Send a request to delete messages with the specified IDs.
@@ -332,6 +336,27 @@ class ChatClientApp:
                 self.delete_ids_var.set("")
             else:
                 self.response_label.config(text=f"Error deleting messages: {resp_json.get('error')}")
+        except Exception as e:
+            self.response_label.config(text=f"Error: {str(e)}")
+
+    # TODO: make sure the username matches the authenticated username in order for the deletion to happen
+    def on_delete_account(self) -> None:
+        """
+        Called when the Delete Account button is pressed.
+        Sends a delete_account request via ChatClient and displays the result.
+        """
+        username = self.from_var.get().strip()
+        if not username:
+            self.response_label.config(text="Please enter your username to delete your account.")
+            return
+
+        try:
+            resp_json: Dict[str, Any] = self.client.delete_account(username)
+            if resp_json.get("status") == "ok":
+                self.response_label.config(text="Account has been deleted, close app to finish.")
+            else:
+                error = resp_json.get("error", "Unknown error")
+                self.response_label.config(text=f"Error deleting account: {error}")
         except Exception as e:
             self.response_label.config(text=f"Error: {str(e)}")
 

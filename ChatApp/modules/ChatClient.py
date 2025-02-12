@@ -56,6 +56,24 @@ class ChatClient:
                 if "session_id" in resp_json:
                     self.session_id = resp_json["session_id"]
                 return resp_json
+            
+    def delete_account(self, username):
+        wire_message = WireMessageJSON.make_wire_message(
+            action="delete_account",
+            from_user=username,
+            to_user="",  # not used for deletion
+            password="",  # not needed here
+            msg="",
+            session_id=self.session_id
+        )
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
+            raw_socket.connect((self.host, self.port))
+            with self.context.wrap_socket(raw_socket, server_side=False, server_hostname=self.host) as s:
+                s.sendall(wire_message)
+                resp_bytes: bytes = WireMessageJSON.read_wire_message(s)
+                resp_json: Dict[str, Any] = WireMessageJSON.parse_wire_message(resp_bytes)
+                return resp_json
 
     # ------------------------------
     # NEW: Persistent listener for real-time messages

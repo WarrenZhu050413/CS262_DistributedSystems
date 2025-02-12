@@ -275,11 +275,17 @@ class ChatServer:
             from_user = req.get("from_user", "")
             msg_ids_str = req.get("message", "")
             return self.handle_delete_messages(session_id, from_user, msg_ids_str)
+        
+        elif action == "delete_account":
+            session_id = req.get("session_id")
+            username = req.get("from_user", "")
+            return self.handle_delete_account(username, session_id)
 
         else:
             result = {"status": "error", "error": f"Unknown action: {action}"}
             self.logger.info("Returning from handle_json_request (unknown action): %s", result)
             return result
+        
 
     def get_all_usernames(self):
         """
@@ -536,6 +542,7 @@ class ChatServer:
 
         # Retrieve the delivered messages for this user. TODO: may need to tweak this?
         c.execute("SELECT id, from_user, content FROM messages WHERE to_user=? AND delivered=1 ORDER BY id", (from_user,))
+        # also include messages sent by this user, no matter the delivery status. if needed, sort in order of id.
         rows = c.fetchall()
         messages_list = []
         for row in rows:
@@ -548,6 +555,43 @@ class ChatServer:
         conn.close()
 
         return {"status": "ok", "message": f"Deleted messages: {ids}", "messages": messages_list}
+    
+    def handle_delete_account(self, username, session_id):
+        """
+        Delete the user account from the database along with all messages
+        sent to or sent by this user. Remove the user's active session and any
+        persistent listener.
+        """
+        # Validate the session.
+        if not session_id or session_id not in self.active_sessions or self.active_sessions[session_id] != username:
+            result = {"status": "error", "error": "Invalid session"}
+            self.logger.info("Returning from handle_delete_account: %s", result)
+            return result
+
+        try:
+            conn = sqlite3.connect(self.db_file)
+            c = conn.cursor()
+            # Delete the user from the users table.
+            c.execute("DELETE FROM users WHERE username = ?", (username,))
+            # Delete all messages where the user is either the sender or recipient.
+            c.execute("DELETE FROM messages WHERE from_user = ? OR to_user = ?", (username, username))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            result = {"status": "error", "error": f"Database error: {str(e)}"}
+            self.logger.info("Returning from handle_delete_account: %s", result)
+            return result
+
+        # Remove the session.
+        if session_id in self.active_sessions:
+            del self.active_sessions[session_id]
+        # Remove any persistent listener for this user.
+        if username in self.listeners:
+            del self.listeners[username]
+
+        result = {"status": "ok", "message": "Account has been deleted, close app to finish."}
+        self.logger.info("Returning from handle_delete_account: %s", result)
+        return result
 
     def start(self):
         self.setup_logging()
