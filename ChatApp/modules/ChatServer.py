@@ -269,6 +269,12 @@ class ChatServer:
             result = {"status": "ok", "message": "Listening for real-time messages"}
             self.logger.info("Returning from handle_json_request (listen): %s", result)
             return result
+    
+        elif action == "delete_messages":
+            session_id = req.get("session_id")
+            from_user = req.get("from_user", "")
+            msg_ids_str = req.get("message", "")
+            return self.handle_delete_messages(session_id, from_user, msg_ids_str)
 
         else:
             result = {"status": "error", "error": f"Unknown action: {action}"}
@@ -490,6 +496,7 @@ class ChatServer:
         for row in rows:
             _id, from_user_db, content = row
             messages_list.append({
+                "id": _id,
                 "from_user": from_user_db,
                 "content": content
             })
@@ -499,6 +506,48 @@ class ChatServer:
         result = {"status": "ok", "messages": messages_list}
         self.logger.info("Returning from handle_read_messages: %s", result)
         return result
+    
+    def handle_delete_messages(self, session_id, from_user, msg_ids_str):
+        """
+        Delete the messages whose IDs are specified in msg_ids_str (a comma-separated string).
+        Return a response with the remaining undelivered messages for the user.
+        """
+        # Validate session.
+        if not session_id or session_id not in self.active_sessions:
+            return {"status": "error", "error": "Invalid session"}
+        if from_user != self.active_sessions[session_id]:
+            return {"status": "error", "error": "Session does not match 'from' user"}
+
+        # Parse the comma-separated message IDs.
+        try:
+            ids = [int(x.strip()) for x in msg_ids_str.split(',') if x.strip()]
+            print(ids)
+            if not ids:
+                return {"status": "error", "error": "No valid message IDs provided"}
+        except Exception as e:
+            return {"status": "error", "error": f"Invalid message IDs: {str(e)}"}
+
+        conn = sqlite3.connect(self.db_file)
+        c = conn.cursor()
+        placeholders = ','.join(['?'] * len(ids))
+        # Only delete messages for this user.
+        c.execute(f"DELETE FROM messages WHERE id IN ({placeholders}) AND to_user=?", (*ids, from_user))
+        conn.commit()
+
+        # Retrieve the delivered messages for this user. TODO: may need to tweak this?
+        c.execute("SELECT id, from_user, content FROM messages WHERE to_user=? AND delivered=1 ORDER BY id", (from_user,))
+        rows = c.fetchall()
+        messages_list = []
+        for row in rows:
+            _id, from_user_db, content = row
+            messages_list.append({
+                "id": _id,
+                "from_user": from_user_db,
+                "content": content
+            })
+        conn.close()
+
+        return {"status": "ok", "message": f"Deleted messages: {ids}", "messages": messages_list}
 
     def start(self):
         self.setup_logging()

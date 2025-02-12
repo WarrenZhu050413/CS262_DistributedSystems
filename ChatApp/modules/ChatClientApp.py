@@ -110,6 +110,16 @@ class ChatClientApp:
         self.incoming_messages_text = tk.Text(messages_frame, width=60, height=10, state="disabled")
         self.incoming_messages_text.pack(fill="both", expand=True, padx=5, pady=5)
 
+        # ========= Delete Messages Frame =========
+        delete_frame = tk.LabelFrame(self.root, text="Delete Messages")
+        delete_frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+        tk.Label(delete_frame, text="Enter Message IDs (comma-separated):").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        self.delete_ids_var = tk.StringVar()
+        tk.Entry(delete_frame, textvariable=self.delete_ids_var, width=30).grid(row=0, column=1, padx=5, pady=5)
+        delete_btn = tk.Button(delete_frame, text="Delete Messages", command=self.on_delete_messages)
+        delete_btn.grid(row=0, column=2, padx=5, pady=5)
+
     def on_login_click(self) -> None:
         """
         Set the action to 'login' and invoke the send click handler.
@@ -272,10 +282,10 @@ class ChatClientApp:
                 msgs = resp_json.get("messages", [])
                 if msgs:
                     for m in msgs:
-                        # Each m might be something like {"from": "...", "content": "..."}
+                        msg_id = m.get("id", "N/A")
                         frm = m.get("from_user", "unknown")
                         content = m.get("content", "")
-                        self._append_incoming_messages(f"From {frm}: {content}\n")
+                        self._append_incoming_messages(f"ID {msg_id}: From {frm}: {content}\n")
                 else:
                     self._append_incoming_messages("No new messages.\n")
             else:
@@ -283,6 +293,47 @@ class ChatClientApp:
                 self._append_incoming_messages(f"Error fetching messages: {error_text}\n")
         except Exception as e:
             self._append_incoming_messages(f"Failed to fetch messages: {str(e)}\n")
+
+    def on_delete_messages(self) -> None:
+        """
+        Send a request to delete messages with the specified IDs.
+        After deletion, refresh the incoming messages display with the updated list.
+        """
+        msg_ids_str = self.delete_ids_var.get().strip()
+        print(msg_ids_str)
+        if not msg_ids_str:
+            self.response_label.config(text="Please enter message IDs to delete.")
+            return
+
+        try:
+            resp_json: Dict[str, Any] = self.client.send_request(
+                action="delete_messages",
+                from_user=self.from_var.get().strip(),
+                to_user="",
+                password=self.password_var.get().strip(),
+                msg=msg_ids_str
+            )
+            if resp_json.get("status") == "ok":
+                self.response_label.config(text=resp_json.get("message", "Messages deleted."))
+                # Refresh the incoming messages text widget with the remaining messages.
+                self.incoming_messages_text.config(state="normal")
+                self.incoming_messages_text.delete(1.0, tk.END)
+                messages = resp_json.get("messages", [])
+                if messages:
+                    for m in messages:
+                        msg_id = m.get("id", "N/A")
+                        frm = m.get("from_user", "unknown")
+                        content = m.get("content", "")
+                        self.incoming_messages_text.insert(tk.END, f"ID {msg_id}: From {frm}: {content}\n")
+                else:
+                    self.incoming_messages_text.insert(tk.END, "No new messages.\n")
+                self.incoming_messages_text.config(state="disabled")
+                # Clear the delete message IDs entry.
+                self.delete_ids_var.set("")
+            else:
+                self.response_label.config(text=f"Error deleting messages: {resp_json.get('error')}")
+        except Exception as e:
+            self.response_label.config(text=f"Error: {str(e)}")
 
     def _append_incoming_messages(self, text: str) -> None:
         """
@@ -305,7 +356,9 @@ class ChatClientApp:
         """
         def update_gui():
             if msg_json.get("status") == "ok" and "message" in msg_json and "from_user" in msg_json:
-                self._append_incoming_messages(f"Real-time from {msg_json['from_user']}: {msg_json['message']}\n")
+                self._append_incoming_messages(f"From {msg_json['from_user']} [ID: ]: {msg_json['message']}\n")
+                print("printing msg_json")
+                print(msg_json)
             elif msg_json.get("status") == "error":
                 self._append_incoming_messages(f"Real-time error: {msg_json.get('error')}\n")
             else:
