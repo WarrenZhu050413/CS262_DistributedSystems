@@ -278,7 +278,7 @@ Build a basic front-end and back-end first. The aim is that they can exchange me
 - The server reads these fields in sequence to reconstruct the message.  
 - This approach avoids complexities of parsing JSON on the wire.
 - Since our base JSON implementation passes all information in their byte format, the size of the information passed is the same. However, our custom protocol is more scalable and efficient for larger systems due to its fast encoding and parsing speeds. We compare the efficiency of our protocols below.
-![image]('ChatApp/efficiency.png')
+![image](efficiency.png)
 - As shown in the plot, our custom protocol is more efficient, achieving an average time around 40% faster than our JSON implementation.
 
 ---
