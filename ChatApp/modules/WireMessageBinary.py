@@ -14,11 +14,11 @@ class WireMessageBinary(WireMessage):
     protocol_version: int = 2
     # Define the replacement mapping (used during serialization).
     _REPLACEMENTS = {
-        '{': c1,  # File Separator (FS)
-        '}': c2,  # Group Separator (GS)
-        '[': c3,  # Record Separator (RS)
-        ']': c4,  # Unit Separator (US)
-        ',': c5,  # Escape (ESC) -- used here for commas
+        '{': c1, 
+        '}': c2,
+        '[': c3,
+        ']': c4, 
+        ',': c5, 
     }
     
     _REVERSE_REPLACEMENTS = {v: k for k, v in _REPLACEMENTS.items()}
