@@ -205,13 +205,17 @@ class ChatServer:
 
     def _close_connection(self, tls_conn: socket.socket, data, error_message: str) -> None:
         """
-        Log an error message, unregister the socket, remove any persistent listener,
+        Log a message, unregister the socket, remove any persistent listener,
         and close the connection.
         """
         if hasattr(data, 'username'):
             if data.username in self.listeners and self.listeners[data.username] is data:
                 del self.listeners[data.username]
-        self.logger.error(error_message)
+        # Log as INFO if the message indicates a normal connection close.
+        if error_message.startswith("Closing connection"):
+            self.logger.info(error_message)
+        else:
+            self.logger.error(error_message)
         self.sel.unregister(tls_conn)
         tls_conn.close()
 

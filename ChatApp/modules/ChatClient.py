@@ -49,6 +49,9 @@ class ChatClient:
     # ------------------------------
     # NEW: Persistent listener for real-time messages
     # ------------------------------
+        # ------------------------------
+    # NEW: Persistent listener for real-time messages
+    # ------------------------------
     def start_listener(self, from_user: str, callback) -> None:
         """
         Establish a persistent connection to the server and send a 'listen' request.
@@ -56,27 +59,38 @@ class ChatClient:
         """
         def listen_thread():
             try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
-                    raw_socket.connect((self.host, self.port))
-                    with self.context.wrap_socket(raw_socket, server_side=False, server_hostname=self.host) as s:
-                        # Build and send the listen request
-                        listen_wire_message: bytes = WireMessageJSON.make_wire_message(action="listen", from_user=from_user, to_user="", password="", msg="", session_id=self.session_id)
-                        s.sendall(listen_wire_message)
-                        try:
-                            resp_bytes: bytes = WireMessageJSON.read_wire_message(s)
-                        except Exception as e:
-                            return
+                # Create and connect the raw socket.
+                raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                raw_socket.connect((self.host, self.port))
+                # Wrap the raw socket in SSL.
+                s = self.context.wrap_socket(raw_socket, server_side=False, server_hostname=self.host)
+                # Use a with-statement to ensure the wrapped socket is closed properly.
+                with s:
+                    # Build and send the listen request.
+                    listen_wire_message: bytes = WireMessageJSON.make_wire_message(
+                        action="listen",
+                        from_user=from_user,
+                        to_user="",
+                        password="",
+                        msg="",
+                        session_id=self.session_id
+                    )
+                    s.sendall(listen_wire_message)
+                    try:
+                        resp_bytes: bytes = WireMessageJSON.read_wire_message(s)
+                    except Exception as e:
+                        return  # Exit if reading acknowledgement fails
 
-                        # Now keep reading pushed messages indefinitely
-                        while True:
-                            try:
-                                msg_bytes = WireMessageJSON.read_wire_message(s)
-                            except Exception as e:
-                                break
-                            msg_json = WireMessageJSON.parse_wire_message(msg_bytes)
-                            callback(msg_json)
+                    # Now keep reading pushed messages indefinitely.
+                    while True:
+                        try:
+                            msg_bytes = WireMessageJSON.read_wire_message(s)
+                        except Exception as e:
+                            break  # Exit loop if an error occurs
+                        msg_json = WireMessageJSON.parse_wire_message(msg_bytes)
+                        callback(msg_json)
             except Exception as e:
-                # Optionally, pass the error to the callback
+                # Optionally, pass the error to the callback.
                 callback({"status": "error", "error": str(e)})
 
         t = threading.Thread(target=listen_thread, daemon=True)
