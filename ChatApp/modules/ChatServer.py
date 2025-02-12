@@ -8,7 +8,7 @@ import ssl
 import logging
 
 from typing import Dict
-from .WireMessageBinary import WireMessageBinary
+from .WireMessageJSON import WireMessageJSON
 
 class ChatServer:
     """
@@ -112,7 +112,7 @@ class ChatServer:
     def service_connection(self, key, mask):
         """
         Process I/O events on a TLS connection using non-blocking sockets.
-        Uses WireMessageBinary for decoding incoming messages and encoding responses.
+        Uses WireMessageJSON for decoding incoming messages and encoding responses.
         """
         tls_conn = key.fileobj
         data = key.data
@@ -147,7 +147,7 @@ class ChatServer:
     def _handle_read(self, tls_conn: socket.socket, data, key) -> None:
         """
         Read available data from the socket, extract complete messages using
-        WireMessageBinary.parse_wire_message(), dispatch the request, and queue
+        WireMessageJSON.parse_wire_message(), dispatch the request, and queue
         the encoded response for sending.
         """
         try:
@@ -179,14 +179,14 @@ class ChatServer:
             data.inb = data.inb[4+msg_len:]
 
             try:
-                request_obj = WireMessageBinary.parse_wire_message(raw_msg)
+                request_obj = WireMessageJSON.parse_wire_message(raw_msg)
             except Exception as e:
                 error_response = {"status": "error", "error": f"Dict parse error: {str(e)}"}
                 self.queue_message(data, error_response)
                 continue
 
             response_obj = self.handle_request(request_obj, key)
-            response_bytes = WireMessageBinary.encode_message(response_obj)
+            response_bytes = WireMessageJSON.encode_message(response_obj)
             data.outb += response_bytes
 
     def _handle_write(self, tls_conn: socket.socket, data) -> None:
@@ -223,7 +223,7 @@ class ChatServer:
         """
         Encode the response object and append it to the connection's outgoing buffer.
         """
-        response_bytes = WireMessageBinary.encode_message(response_obj)
+        response_bytes = WireMessageJSON.encode_message(response_obj)
         data.outb += response_bytes
 
     def handle_request(self, req, key):

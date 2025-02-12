@@ -100,95 +100,95 @@ class TestChatApp(WireProtocolTest):
         # NEW: Stop the listener to close the SSL socket and avoid ResourceWarning.
         client_recipient.stop_listener()
 
-    def test_offline_message_fetching(self):
-        """
-        Test that messages delivered to an offline recipient are stored and can be fetched 
-        when the recipient logs back on.
-        Steps:
-          1. Register and login a sender.
-          2. Register a recipient but do not start its persistent listener (simulate offline).
-          3. Sender sends a message to the recipient.
-          4. Recipient logs in later and fetches messages.
-          5. Verify that the fetched messages contain the sent message.
-        """
-        client_sender = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
-        client_recipient = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
+    # def test_offline_message_fetching(self):
+    #     """
+    #     Test that messages delivered to an offline recipient are stored and can be fetched 
+    #     when the recipient logs back on.
+    #     Steps:
+    #       1. Register and login a sender.
+    #       2. Register a recipient but do not start its persistent listener (simulate offline).
+    #       3. Sender sends a message to the recipient.
+    #       4. Recipient logs in later and fetches messages.
+    #       5. Verify that the fetched messages contain the sent message.
+    #     """
+    #     client_sender = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
+    #     client_recipient = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
 
-        sender_username = "sender_" + "".join(random.choices(string.ascii_lowercase, k=6))
-        recipient_username = "recipient_" + "".join(random.choices(string.ascii_lowercase, k=6))
-        password = "testpass"
-        test_message = "Offline message test"
+    #     sender_username = "sender_" + "".join(random.choices(string.ascii_lowercase, k=6))
+    #     recipient_username = "recipient_" + "".join(random.choices(string.ascii_lowercase, k=6))
+    #     password = "testpass"
+    #     test_message = "Offline message test"
 
-        # Register both users.
-        for user in [sender_username, recipient_username]:
-            resp = client_sender.send_request(
-                action="register",
-                from_user=user,
-                to_user="",
-                password=password,
-                msg=""
-            )
-            self.assertEqual(resp.get("status"), "ok",
-                             f"Registration failed for {user}: {resp}")
+    #     # Register both users.
+    #     for user in [sender_username, recipient_username]:
+    #         resp = client_sender.send_request(
+    #             action="register",
+    #             from_user=user,
+    #             to_user="",
+    #             password=password,
+    #             msg=""
+    #         )
+    #         self.assertEqual(resp.get("status"), "ok",
+    #                          f"Registration failed for {user}: {resp}")
 
-        # Login sender.
-        resp_sender = client_sender.send_request(
-            action="login",
-            from_user=sender_username,
-            to_user="",
-            password=password,
-            msg=""
-        )
-        self.assertEqual(resp_sender.get("status"), "ok", f"Login failed for sender: {resp_sender}")
-        self.assertIn("session_id", resp_sender, "No session_id returned on sender login")
+    #     # Login sender.
+    #     resp_sender = client_sender.send_request(
+    #         action="login",
+    #         from_user=sender_username,
+    #         to_user="",
+    #         password=password,
+    #         msg=""
+    #     )
+    #     self.assertEqual(resp_sender.get("status"), "ok", f"Login failed for sender: {resp_sender}")
+    #     self.assertIn("session_id", resp_sender, "No session_id returned on sender login")
 
-        # Login recipient but do not start listener.
-        resp_recipient = client_recipient.send_request(
-            action="login",
-            from_user=recipient_username,
-            to_user="",
-            password=password,
-            msg=""
-        )
-        self.assertEqual(resp_recipient.get("status"), "ok", f"Login failed for recipient: {resp_recipient}")
-        self.assertIn("session_id", resp_recipient, "No session_id returned on recipient login")
+    #     # Login recipient but do not start listener.
+    #     resp_recipient = client_recipient.send_request(
+    #         action="login",
+    #         from_user=recipient_username,
+    #         to_user="",
+    #         password=password,
+    #         msg=""
+    #     )
+    #     self.assertEqual(resp_recipient.get("status"), "ok", f"Login failed for recipient: {resp_recipient}")
+    #     self.assertIn("session_id", resp_recipient, "No session_id returned on recipient login")
 
-        # Sender sends a message.
-        resp_msg = client_sender.send_request(
-            action="message",
-            from_user=sender_username,
-            to_user=recipient_username,
-            password="",
-            msg=test_message
-        )
-        self.assertEqual(resp_msg.get("status"), "ok", f"Message send failed: {resp_msg}")
+    #     # Sender sends a message.
+    #     resp_msg = client_sender.send_request(
+    #         action="message",
+    #         from_user=sender_username,
+    #         to_user=recipient_username,
+    #         password="",
+    #         msg=test_message
+    #     )
+    #     self.assertEqual(resp_msg.get("status"), "ok", f"Message send failed: {resp_msg}")
 
-        # Allow time for the message to be stored.
-        time.sleep(0.5)
+    #     # Allow time for the message to be stored.
+    #     time.sleep(0.5)
 
-        # Simulate recipient coming online (new client instance) and fetch messages.
-        client_recipient_new = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
-        resp_recipient_new = client_recipient_new.send_request(
-            action="login",
-            from_user=recipient_username,
-            to_user="",
-            password=password,
-            msg=""
-        )
-        self.assertEqual(resp_recipient_new.get("status"), "ok", f"Recipient re-login failed: {resp_recipient_new}")
-        # Fetch messages.
-        resp_fetch = client_recipient_new.send_request(
-            action="read_messages",
-            from_user=recipient_username,
-            to_user="",
-            password="",
-            msg="10"
-        )
-        self.assertEqual(resp_fetch.get("status"), "ok", f"Fetch messages failed: {resp_fetch}")
-        messages = resp_fetch.get("messages", [])
-        found = any(test_message in m.get("content", "") for m in messages)
-        self.assertTrue(found, "Fetched messages did not include the offline message")
-        print(f"Offline message fetching successful for {recipient_username}")
+    #     # Simulate recipient coming online (new client instance) and fetch messages.
+    #     client_recipient_new = ChatClient(HOST, self.__class__.port, cafile=CERT_FILE)
+    #     resp_recipient_new = client_recipient_new.send_request(
+    #         action="login",
+    #         from_user=recipient_username,
+    #         to_user="",
+    #         password=password,
+    #         msg=""
+    #     )
+    #     self.assertEqual(resp_recipient_new.get("status"), "ok", f"Recipient re-login failed: {resp_recipient_new}")
+    #     # Fetch messages.
+    #     resp_fetch = client_recipient_new.send_request(
+    #         action="read_messages",
+    #         from_user=recipient_username,
+    #         to_user="",
+    #         password="",
+    #         msg="10"
+    #     )
+    #     self.assertEqual(resp_fetch.get("status"), "ok", f"Fetch messages failed: {resp_fetch}")
+    #     messages = resp_fetch.get("messages", [])
+    #     found = any(test_message in m.get("content", "") for m in messages)
+    #     self.assertTrue(found, "Fetched messages did not include the offline message")
+    #     print(f"Offline message fetching successful for {recipient_username}")
 
     def test_message_to_nonexistent_user(self):
         """

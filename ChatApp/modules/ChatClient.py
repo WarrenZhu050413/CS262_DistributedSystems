@@ -2,7 +2,7 @@ import socket
 import ssl
 import threading  # REAL-TIME MOD: Needed for the listener thread
 from typing import Dict, Any, Optional
-from .WireMessageBinary import WireMessageBinary
+from .WireMessageJSON import WireMessageJSON
 
 class ChatClient:
     def __init__(self, host: str, port: int, cafile: str) -> None:
@@ -25,7 +25,7 @@ class ChatClient:
         Build the request, send it over the socket, receive the response.
         Return the parsed response.
         """
-        wire_message: bytes = WireMessageBinary.make_wire_message(
+        wire_message: bytes = WireMessageJSON.make_wire_message(
             action=action,
             from_user=from_user,
             to_user=to_user,
@@ -42,8 +42,8 @@ class ChatClient:
                 s.sendall(wire_message)
 
                 # Read the response.
-                resp_bytes: bytes = WireMessageBinary.read_wire_message(s)
-                resp_dict: Dict[str, Any] = WireMessageBinary.parse_wire_message(resp_bytes)
+                resp_bytes: bytes = WireMessageJSON.read_wire_message(s)
+                resp_dict: Dict[str, Any] = WireMessageJSON.parse_wire_message(resp_bytes)
 
                 # Store the session_id if provided by the server.
                 if "session_id" in resp_dict:
@@ -51,7 +51,7 @@ class ChatClient:
                 return resp_dict
             
     def delete_account(self, username):
-        wire_message = WireMessageBinary.make_wire_message(
+        wire_message = WireMessageJSON.make_wire_message(
             action="delete_account",
             from_user=username,
             to_user="",  # not used for deletion
@@ -64,8 +64,8 @@ class ChatClient:
             raw_socket.connect((self.host, self.port))
             with self.context.wrap_socket(raw_socket, server_side=False, server_hostname=self.host) as s:
                 s.sendall(wire_message)
-                resp_bytes: bytes = WireMessageBinary.read_wire_message(s)
-                resp_dict: Dict[str, Any] = WireMessageBinary.parse_wire_message(resp_bytes)
+                resp_bytes: bytes = WireMessageJSON.read_wire_message(s)
+                resp_dict: Dict[str, Any] = WireMessageJSON.parse_wire_message(resp_bytes)
                 return resp_dict
 
     # ------------------------------
@@ -88,7 +88,7 @@ class ChatClient:
                 self.listener_socket = s
 
                 # Build and send the listen request.
-                listen_wire_message: bytes = WireMessageBinary.make_wire_message(
+                listen_wire_message: bytes = WireMessageJSON.make_wire_message(
                     action="listen",
                     from_user=from_user,
                     to_user="",
@@ -99,17 +99,17 @@ class ChatClient:
                 s.sendall(listen_wire_message)
                 try:
                     # Read the server's acknowledgement.
-                    resp_bytes: bytes = WireMessageBinary.read_wire_message(s)
+                    resp_bytes: bytes = WireMessageJSON.read_wire_message(s)
                 except Exception as e:
                     return  # Exit if reading acknowledgement fails
 
                 # Now keep reading pushed messages indefinitely.
                 while True:
                     try:
-                        msg_bytes = WireMessageBinary.read_wire_message(s)
+                        msg_bytes = WireMessageJSON.read_wire_message(s)
                     except Exception as e:
                         break  # Exit loop if an error occurs (or if the socket is closed)
-                    msg_dict = WireMessageBinary.parse_wire_message(msg_bytes)
+                    msg_dict = WireMessageJSON.parse_wire_message(msg_bytes)
                     callback(msg_dict)
             except Exception as e:
                 callback({"status": "error", "error": str(e)})
