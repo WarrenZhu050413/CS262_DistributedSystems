@@ -2,13 +2,7 @@ import unittest
 import threading
 import time
 import os
-import random
 import socket
-from typing import Dict, Any
-
-# Adjust imports to match your project’s layout:
-# from your_package.ChatServer import ChatServer
-# from your_package.ChatClient import ChatClient
 
 from ChatApp_gRPC.modules.ChatServer import ChatServer
 from ChatApp_gRPC.modules.ChatClient import ChatClient

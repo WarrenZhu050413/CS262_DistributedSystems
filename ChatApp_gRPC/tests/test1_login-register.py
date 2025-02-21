@@ -1,14 +1,10 @@
 import unittest
-import threading
 import time
-import os
 import random
 import string
-import socket
 
 from .WireProtocolTest import WireProtocolTest
 from ..modules.ChatClient import ChatClient
-from ..server import ChatServer
 from ..modules.config import HOST, DB_FILE, CERT_FILE, KEY_FILE, LOG_FILE
 
 ###############################################################################
