@@ -1,0 +1,12 @@
+# conda env create -f environment.yml
+
+name: CS262_ChatApp_gRPC
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - flask
+  - sqlite
+  - ujson
+  - bcrypt
