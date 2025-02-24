@@ -419,7 +419,7 @@ class ChatClientApp:
         self.incoming_messages_text.config(state="disabled")
         self.incoming_messages_text.see(tk.END)  # auto-scroll
 
-    def handle_incoming_message(self, msg_dict: Dict[str, Any]) -> None:
+    def handle_incoming_message(self, msg_pushed: chat_pb2.PushObject) -> None:
         """
         Callback for handling real-time messages from the persistent listener connection.
         Updates the GUI safely from the background thread using root.after.
@@ -427,13 +427,16 @@ class ChatClientApp:
         Args:
             msg_dict (Dict[str, Any]): Dictionary containing the message data
         """
+        status = msg_pushed.status
+        from_user = msg_pushed.from_user
+        content = msg_pushed.content
         def update_gui():
-            if msg_dict.get("status") == "ok" and "message" in msg_dict and "from_user" in msg_dict:
-                self._append_incoming_messages(f"From {msg_dict['from_user']}: {msg_dict['message']}\n")
-                print("printing msg_dict")
-                print(msg_dict)
-            elif msg_dict.get("status") == "error":
-                self._append_incoming_messages(f"Real-time error: {msg_dict.get('error')}\n")
+            if status == "ok" and "message" in msg_dict and "from_user" in msg_dict:
+                self._append_incoming_messages(f"From {from_user}: {content}\n")
+                print("printing msg_pushed")
+                print(msg_pushed)
+            elif status == "error":
+                self._append_incoming_messages(f"Real-time error: {error}\n")
             else:
-                self._append_incoming_messages(f"Real-time: {msg_dict}\n")
+                self._append_incoming_messages(f"Real-time: {content}\n")
         self.root.after(0, update_gui)
