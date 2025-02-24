@@ -3,6 +3,7 @@ syntax = "proto3";
 // Notes:
 // 1. We choose to use the optional keyword to indicate that a field may or may not be present.
 // Problem with using message as the field name as it clashes with a keyword
+// Indirection
 
 
 package chat;
@@ -121,7 +122,7 @@ message DeleteAccountRequest {
 
 message DeleteAccountResponse {
   string status = 1;
-  string message = 2;
+  string content = 2;
   string error = 3;
 }
 

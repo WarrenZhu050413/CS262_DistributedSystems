@@ -861,7 +861,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         self.logger.info("Returning from handle_delete_messages: %s", result)
         return chat_pb2.DeleteMessagesResponse(status=result["status"], content=result["message"], messages=result["messages"])
     
-    def handle_delete_account(self, username, session_id):
+    def handle_delete_account(self, request, context):
         """
         Delete a user account and all associated data.
         
@@ -879,11 +879,14 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         4. Removes session and listener
         5. Returns success message
         """
+        username = request.username
+        session_id = request.session_id
+
         # Validate the session.
         if not session_id or session_id not in self.active_sessions or self.active_sessions[session_id] != username:
             result = {"status": "error", "error": "Invalid session"}
             self.logger.info("Returning from handle_delete_account: %s", result)
-            return result
+            return chat_pb2.DeleteAccountResponse(status=result["status"], error=result["error"])
 
         try:
             conn = sqlite3.connect(self.db_file)
@@ -897,7 +900,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         except Exception as e:
             result = {"status": "error", "error": f"Database error: {str(e)}"}
             self.logger.info("Returning from handle_delete_account: %s", result)
-            return result
+            return chat_pb2.DeleteAccountResponse(status=result["status"], error=result["error"])
 
         # Remove the session.
         if session_id in self.active_sessions:
@@ -906,9 +909,9 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         if username in self.listeners:
             del self.listeners[username]
 
-        result = {"status": "ok", "message": "Account has been deleted, close app to finish."}
+        result = {"status": "ok", "content": "Account has been deleted, close app to finish."}
         self.logger.info("Returning from handle_delete_account: %s", result)
-        return result
+        return chat_pb2.DeleteAccountResponse(status=result["status"], content=result["content"])
 
     def start(self):
         self.setup_logging()
