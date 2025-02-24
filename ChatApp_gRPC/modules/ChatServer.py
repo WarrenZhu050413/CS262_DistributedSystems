@@ -1,24 +1,18 @@
 import grpc
 from concurrent import futures
-import logging
+import secrets
 import sqlite3
 import bcrypt
-import secrets
-import socket
-import selectors
-import types
-import sqlite3
-import bcrypt
-import secrets
 import ssl
 import logging
 from generated import chat_pb2, chat_pb2_grpc
 
 # Changed message_list into a protobuf list of ChatMessage objects.
+# Changed name to ChatServiceServicer.
+# Make sure that everything is in the correct type. Things are converted to int if they are actually ints.
 
 from typing import Dict
-from .WireMessageBinary import WireMessageBinary
-class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
+class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
     """
     A secure chat server implementation that handles multiple concurrent client connections.
     
@@ -430,12 +424,12 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
     #         session_id = req.get("session_id")
     #         if not session_id or session_id not in self.active_sessions or self.active_sessions[session_id] != username:
     #             result = {"status": "error", "error": "Invalid session for listening"}
-    #             self.logger.info("Returning from handle_request (listen): %s", result)
+    #             self.logger.info("Returning from request (listen): %s", result)
     #             return result
     #         key.data.username = username
     #         self.listeners[username] = key.data
     #         result = {"status": "ok", "message": "Listening for real-time messages"}
-    #         self.logger.info("Returning from handle_request (listen): %s", result)
+    #         self.logger.info("Returning from request (listen): %s", result)
     #         return result
     
     #     elif action == "delete_messages":
@@ -451,7 +445,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
 
     #     else:
     #         result = {"status": "error", "error": f"Unknown action: {action}"}
-    #         self.logger.info("Returning from handle_request (unknown action): %s", result)
+    #         self.logger.info("Returning from request (unknown action): %s", result)
     #         return result
         
 
@@ -492,7 +486,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
 
         if len(password) >= 256:
             result = {"status": "error", "error": "Password is too long"}
-            self.logger.info("Returning from handle_register: %s", result)
+            self.logger.info("Returning from Register: %s", result)
             return chat_pb2.RegisterResponse(status=result["status"], error=result["error"])
 
         conn = sqlite3.connect(self.db_file)
@@ -505,7 +499,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         if row is not None:
             conn.close()
             result = {"status": "error", "error": "Username already exists"}
-            self.logger.info("Returning from handle_register: %s", result)
+            self.logger.info("Returning from Register: %s", result)
             self.logger.info("Usernames in DB: %s", self.get_all_usernames())
             return chat_pb2.RegisterResponse(status=result["status"], error=result["error"])
 
@@ -516,12 +510,12 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         except Exception as e:
             conn.close()
             result = {"status": "error", "error": f"Database error: {str(e)}"}
-            self.logger.info("Returning from handle_register: %s", result)
+            self.logger.info("Returning from Register: %s", result)
             return chat_pb2.RegisterResponse(status=result["status"], error=result["error"])
 
         conn.close()
         result = {"status": "ok", "message": "Registration successful"}
-        self.logger.info("Returning from handle_register: %s", result)
+        self.logger.info("Returning from Register: %s", result)
         return chat_pb2.RegisterResponse(status=result["status"], content=result["message"])
 
     def Login(self, request, context):
@@ -552,13 +546,13 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
 
         if not row:
             result = {"status": "error", "error": "Invalid username or password"}
-            self.logger.info("Returning from handle_login: %s", result)
+            self.logger.info("Returning from Login: %s", result)
             return chat_pb2.LoginResponse(status=result["status"], error=result["error"])
 
         stored_hashed_pass = row[0]
         if not bcrypt.checkpw(password.encode('utf-8'), stored_hashed_pass.encode('utf-8')):
             result = {"status": "error", "error": "Invalid username or password"}
-            self.logger.info("Returning from handle_login: %s", result)
+            self.logger.info("Returning from Login: %s", result)
             return chat_pb2.LoginResponse(status=result["status"], error=result["error"])
 
         session_id = secrets.token_hex(16)
@@ -573,8 +567,8 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         conn.close()
 
         result = {"status": "ok", "session_id": session_id, "unread_messages": unread_count}
-        self.logger.info("Returning from handle_login: %s", result)
-        return chat_pb2.LoginResponse(status=result["status"], session_id=result['session_id'], unread_messages=result['unread_messages'])
+        self.logger.info("Returning from Login: %s", result)
+        return chat_pb2.LoginResponse(status=result["status"], session_id=result['session_id'], unread_messages=int(result['unread_messages']))
 
 
     def SendMessage(self, request, context):
@@ -605,12 +599,12 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         if not session_id or session_id not in self.active_sessions:
             self.logger.error(f"Invalid session: {session_id} from user: {from_user}")
             result = {"status": "error", "error": "Invalid session"}
-            self.logger.info("Returning from handle_message: %s", result)
+            self.logger.info("Returning from SendMessage: %s", result)
             return chat_pb2.SendMessageResponse(status=result["status"], error=result["error"])
 
         if from_user != self.active_sessions[session_id]:
             result = {"status": "error", "error": "Session does not match 'from' user"}
-            self.logger.info("Returning from handle_message: %s", result)
+            self.logger.info("Returning from SendMessage: %s", result)
             return chat_pb2.SendMessageResponse(status=result["status"], error=result["error"])
         
         conn = sqlite3.connect(self.db_file)
@@ -621,7 +615,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         if row is None:
             conn.close()
             result = {"status": "error", "error": "Recipient does not exist"}
-            self.logger.info("Returning from handle_message: %s", result)
+            self.logger.info("Returning from SendMessage: %s", result)
             return chat_pb2.SendMessageResponse(status=result["status"], error=result["error"])
 
         try:
@@ -634,7 +628,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         except Exception as e:
             conn.close()
             result = {"status": "error", "error": f"Database error: {str(e)}"}
-            self.logger.info("Returning from handle_message: %s", result)
+            self.logger.info("Returning from SendMessage: %s", result)
             return chat_pb2.SendMessageResponse(status=result["status"], error=result["error"])
 
         if to_user in self.listeners:
@@ -646,18 +640,18 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
                 conn.commit()
                 conn.close()
                 result = {"status": "ok", "message": f"Message delivered to {to_user} in real-time"}
-                self.logger.info("Returning from handle_message: %s", result)
+                self.logger.info("Returning from SendMessage: %s", result)
                 return chat_pb2.SendMessageResponse(status=result["status"], message=result["message"])
             except Exception as e:
                 self.logger.error(f"Real-time delivery failed: {str(e)}")
                 conn.close()
                 result = {"status": "ok", "message": f"Message stored for delivery to {to_user}"}
-                self.logger.info("Returning from handle_message: %s", result)
+                self.logger.info("Returning from SendMessage: %s", result)
                 return chat_pb2.SendMessageResponse(status=result["status"], content=result["message"])
         else:
             conn.close()
             result = {"status": "ok", "message": f"Message stored for delivery to {to_user}"}
-            self.logger.info("Returning from handle_message: %s", result)
+            self.logger.info("Returning from SendMessage: %s", result)
             return chat_pb2.SendMessageResponse(status=result["status"], content=result["message"])
 
     def ReadMessages(self, request, context):
@@ -685,12 +679,12 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         if not session_id or session_id not in self.active_sessions:
             self.logger.error(f"Invalid session for read_messages: {session_id}")
             result = {"status": "error", "error": "Invalid session"}
-            self.logger.info("Returning from handle_read_messages: %s", result)
+            self.logger.info("Returning from ReadMessages: %s", result)
             return chat_pb2.ReadMessagesResponse(status=result["status"], error=result["error"])
 
         if from_user != self.active_sessions[session_id]:
             result = {"status": "error", "error": "Session does not match 'from' user"}
-            self.logger.info("Returning from handle_read_messages: %s", result)
+            self.logger.info("Returning from ReadMessages: %s", result)
             return chat_pb2.ReadMessagesResponse(status=result["status"], error=result["error"])
 
         try:
@@ -719,14 +713,14 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         except Exception as e:
             conn.close()
             result = {"status": "error", "error": f"Database error: {str(e)}"}
-            self.logger.info("Returning from handle_read_messages: %s", result)
+            self.logger.info("Returning from ReadMessages: %s", result)
             return chat_pb2.ReadMessagesResponse(status=result["status"], error=result["error"])
 
         messages_list = []
         for row in rows:
             _id, from_user_db, content = row
             message = chat_pb2.ChatMessage(
-                id=_id,
+                id=int(_id),
                 from_user=from_user_db,
                 content=content
             )
@@ -735,7 +729,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         conn.close()
 
         result = {"status": "ok", "messages": messages_list}
-        self.logger.info("Returning from handle_read_messages: %s", result)
+        self.logger.info("Returning from ReadMessages: %s", result)
         return chat_pb2.ReadMessagesResponse(status=result["status"], messages=result["messages"])
 
 
@@ -761,7 +755,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         if not session_id or session_id not in self.active_sessions:
             self.logger.error(f"Invalid session for list_accounts: {session_id}")
             result = {"status": "error", "error": "Invalid session"}
-            self.logger.info("Returning from handle_list_accounts: %s", result)
+            self.logger.info("Returning from ListAccounts: %s", result)
             return chat_pb2.ListAccountsResponse(status=result["status"], error=result["error"])
 
         if not pattern.strip():
@@ -778,14 +772,14 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         except Exception as e:
             conn.close()
             result = {"status": "error", "error": f"Database error: {str(e)}"}
-            self.logger.info("Returning from handle_list_accounts: %s", result)
+            self.logger.info("Returning from ListAccounts: %s", result)
             return chat_pb2.ListAccountsResponse(status=result["status"], error=result["error"])
 
         accounts = [r[0] for r in rows]
         conn.close()
 
         result = {"status": "ok", "accounts": accounts}
-        self.logger.info("Returning from handle_list_accounts: %s", result)
+        self.logger.info("Returning from ListAccounts: %s", result)
         return chat_pb2.ListAccountsResponse(status=result["status"], accounts=result["accounts"])
 
     
@@ -814,11 +808,11 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         # Validate session.
         if not session_id or session_id not in self.active_sessions:
             result = {"status": "error", "error": "Invalid session"}
-            self.logger.info("Returning from handle_delete_messages: %s", result)
+            self.logger.info("Returning from DeleteMessages: %s", result)
             return chat_pb2.DeleteMessagesResponse(status=result["status"], error=result["error"])
         if from_user != self.active_sessions[session_id]:
             result = {"status": "error", "error": "Session does not match 'from' user"}
-            self.logger.info("Returning from handle_delete_messages: %s", result)
+            self.logger.info("Returning from DeleteMessages: %s", result)
             return chat_pb2.DeleteMessagesResponse(status=result["status"], error=result["error"])
 
         # Parse the comma-separated message IDs.
@@ -827,11 +821,11 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
             print(ids)
             if not ids:
                 result = {"status": "error", "error": "No valid message IDs provided"}
-                self.logger.info("Returning from handle_delete_messages: %s", result)
+                self.logger.info("Returning from DeleteMessages: %s", result)
                 return chat_pb2.DeleteMessagesResponse(status=result["status"], error=result["error"])
         except Exception as e:
             result = {"status": "error", "error": f"Invalid message IDs: {str(e)}"}
-            self.logger.info("Returning from handle_delete_messages: %s", result)
+            self.logger.info("Returning from DeleteMessages: %s", result)
             return chat_pb2.DeleteMessagesResponse(status=result["status"], error=result["error"])
 
         conn = sqlite3.connect(self.db_file)
@@ -853,7 +847,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         for row in rows:
             _id, from_user_db, content = row
             message = chat_pb2.ChatMessage(
-                id=_id,
+                id=int(_id),
                 from_user=from_user_db,
                 content=content
             )
@@ -861,10 +855,10 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         conn.close()
 
         result = {"status": "ok", "message": f"Deleted messages: {ids}", "messages": messages_list}
-        self.logger.info("Returning from handle_delete_messages: %s", result)
+        self.logger.info("Returning from DeleteMessages: %s", result)
         return chat_pb2.DeleteMessagesResponse(status=result["status"], content=result["message"], messages=result["messages"])
     
-    def handle_delete_account(self, request, context):
+    def DeleteAccount(self, request, context):
         """
         Delete a user account and all associated data.
         
@@ -888,7 +882,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         # Validate the session.
         if not session_id or session_id not in self.active_sessions or self.active_sessions[session_id] != username:
             result = {"status": "error", "error": "Invalid session"}
-            self.logger.info("Returning from handle_delete_account: %s", result)
+            self.logger.info("Returning from DeleteAccount: %s", result)
             return chat_pb2.DeleteAccountResponse(status=result["status"], error=result["error"])
 
         try:
@@ -902,7 +896,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
             conn.close()
         except Exception as e:
             result = {"status": "error", "error": f"Database error: {str(e)}"}
-            self.logger.info("Returning from handle_delete_account: %s", result)
+            self.logger.info("Returning from DeleteAccount: %s", result)
             return chat_pb2.DeleteAccountResponse(status=result["status"], error=result["error"])
 
         # Remove the session.
@@ -913,7 +907,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
             del self.listeners[username]
 
         result = {"status": "ok", "content": "Account has been deleted, close app to finish."}
-        self.logger.info("Returning from handle_delete_account: %s", result)
+        self.logger.info("Returning from DeleteAccount: %s", result)
         return chat_pb2.DeleteAccountResponse(status=result["status"], content=result["content"])
 
 def serve():
