@@ -4,6 +4,7 @@ import secrets
 import sqlite3
 import bcrypt
 import ssl
+import queue
 import logging
 from generated import chat_pb2, chat_pb2_grpc
 from proto_generated.chat_pb2_grpc import add_ChatServiceServicer_to_server
@@ -352,19 +353,19 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
     #     self.sel.unregister(tls_conn)
     #     tls_conn.close()
 
-    def queue_message(self, data, response_obj) -> None:
-        """
-        Queue a response message for sending.
+    # def queue_message(self, data, response_obj) -> None:
+    #     """
+    #     Queue a response message for sending.
         
-        Args:
-            data: Connection data object
-            response_obj: Response dictionary to encode and queue
+    #     Args:
+    #         data: Connection data object
+    #         response_obj: Response dictionary to encode and queue
             
-        Encodes the response using WireMessageBinary and adds
-        it to the connection's outgoing buffer.
-        """
-        response_bytes = WireMessageBinary.encode_message(response_obj)
-        data.outb += response_bytes
+    #     Encodes the response using WireMessageBinary and adds
+    #     it to the connection's outgoing buffer.
+    #     """
+    #     response_bytes = WireMessageBinary.encode_message(response_obj)
+    #     data.outb += response_bytes
 
     # def handle_request(self, req, key):
     #     """
