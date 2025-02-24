@@ -10,3 +10,9 @@ dependencies:
   - sqlite
   - ujson
   - bcrypt
+  - grpcio
+  - grpcio-tools
+  - protobuf
+  - pyopenssl
+  - pyasn1
+  - pyasn1-modules

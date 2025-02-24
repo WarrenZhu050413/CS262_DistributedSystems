@@ -1,3 +1,9 @@
+import grpc
+from concurrent import futures
+import logging
+import sqlite3
+import bcrypt
+import secrets
 import socket
 import selectors
 import types
@@ -6,11 +12,11 @@ import bcrypt
 import secrets
 import ssl
 import logging
+from generated import chat_pb2, chat_pb2_grpc
 
 from typing import Dict
 from .WireMessageBinary import WireMessageBinary
-
-class ChatServer:
+class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
     """
     A secure chat server implementation that handles multiple concurrent client connections.
     
@@ -364,84 +370,84 @@ class ChatServer:
         response_bytes = WireMessageBinary.encode_message(response_obj)
         data.outb += response_bytes
 
-    def handle_request(self, req, key):
-        """
-        Route and handle client requests.
+    # def handle_request(self, req, key):
+    #     """
+    #     Route and handle client requests.
         
-        Args:
-            req: The decoded request dictionary
-            key: Selector key for the connection
+    #     Args:
+    #         req: The decoded request dictionary
+    #         key: Selector key for the connection
             
-        Returns:
-            dict: Response object to send back to client
+    #     Returns:
+    #         dict: Response object to send back to client
             
-        Supports these actions:
-        - register: Create new user account
-        - login: Authenticate and create session
-        - message: Send message to another user
-        - list_accounts: List matching usernames
-        - read_messages: Retrieve undelivered messages
-        - listen: Register for real-time messages
-        - delete_messages: Remove messages
-        - delete_account: Remove user account
-        """
-        action = req.get("action", "").lower()
-        if action == "register":
-            username = req.get("from_user", "")
-            password = req.get("password", "")
-            return self.handle_register(username, password)
+    #     Supports these actions:
+    #     - register: Create new user account
+    #     - login: Authenticate and create session
+    #     - message: Send message to another user
+    #     - list_accounts: List matching usernames
+    #     - read_messages: Retrieve undelivered messages
+    #     - listen: Register for real-time messages
+    #     - delete_messages: Remove messages
+    #     - delete_account: Remove user account
+    #     """
+    #     action = req.get("action", "").lower()
+    #     if action == "register":
+    #         username = req.get("from_user", "")
+    #         password = req.get("password", "")
+    #         return self.handle_register(username, password)
 
-        elif action == "login":
-            username = req.get("from_user", "")
-            password = req.get("password", "")
-            return self.handle_login(username, password)
+    #     elif action == "login":
+    #         username = req.get("from_user", "")
+    #         password = req.get("password", "")
+    #         return self.handle_login(username, password)
 
-        elif action == "message":
-            session_id = req.get("session_id")
-            from_user = req.get("from_user", "")
-            to_user = req.get("to_user", "")
-            message = req.get("message", "")
-            return self.handle_message(session_id, from_user, to_user, message)
+    #     elif action == "message":
+    #         session_id = req.get("session_id")
+    #         from_user = req.get("from_user", "")
+    #         to_user = req.get("to_user", "")
+    #         message = req.get("message", "")
+    #         return self.handle_message(session_id, from_user, to_user, message)
 
-        elif action == "list_accounts":
-            session_id = req.get("session_id")
-            pattern = req.get("message", "")
-            return self.handle_list_accounts(session_id, pattern)
+    #     elif action == "list_accounts":
+    #         session_id = req.get("session_id")
+    #         pattern = req.get("message", "")
+    #         return self.handle_list_accounts(session_id, pattern)
 
-        elif action == "read_messages":
-            session_id = req.get("session_id")
-            from_user = req.get("from_user", "")
-            count_str = req.get("message", "")
-            return self.handle_read_messages(session_id, from_user, count_str)
+    #     elif action == "read_messages":
+    #         session_id = req.get("session_id")
+    #         from_user = req.get("from_user", "")
+    #         count_str = req.get("message", "")
+    #         return self.handle_read_messages(session_id, from_user, count_str)
 
-        elif action == "listen":
-            username = req.get("from_user", "")
-            session_id = req.get("session_id")
-            if not session_id or session_id not in self.active_sessions or self.active_sessions[session_id] != username:
-                result = {"status": "error", "error": "Invalid session for listening"}
-                self.logger.info("Returning from handle_request (listen): %s", result)
-                return result
-            key.data.username = username
-            self.listeners[username] = key.data
-            result = {"status": "ok", "message": "Listening for real-time messages"}
-            self.logger.info("Returning from handle_request (listen): %s", result)
-            return result
+    #     elif action == "listen":
+    #         username = req.get("from_user", "")
+    #         session_id = req.get("session_id")
+    #         if not session_id or session_id not in self.active_sessions or self.active_sessions[session_id] != username:
+    #             result = {"status": "error", "error": "Invalid session for listening"}
+    #             self.logger.info("Returning from handle_request (listen): %s", result)
+    #             return result
+    #         key.data.username = username
+    #         self.listeners[username] = key.data
+    #         result = {"status": "ok", "message": "Listening for real-time messages"}
+    #         self.logger.info("Returning from handle_request (listen): %s", result)
+    #         return result
     
-        elif action == "delete_messages":
-            session_id = req.get("session_id")
-            from_user = req.get("from_user", "")
-            msg_ids_str = req.get("message", "")
-            return self.handle_delete_messages(session_id, from_user, msg_ids_str)
+    #     elif action == "delete_messages":
+    #         session_id = req.get("session_id")
+    #         from_user = req.get("from_user", "")
+    #         msg_ids_str = req.get("message", "")
+    #         return self.handle_delete_messages(session_id, from_user, msg_ids_str)
         
-        elif action == "delete_account":
-            session_id = req.get("session_id")
-            username = req.get("from_user", "")
-            return self.handle_delete_account(username, session_id)
+    #     elif action == "delete_account":
+    #         session_id = req.get("session_id")
+    #         username = req.get("from_user", "")
+    #         return self.handle_delete_account(username, session_id)
 
-        else:
-            result = {"status": "error", "error": f"Unknown action: {action}"}
-            self.logger.info("Returning from handle_request (unknown action): %s", result)
-            return result
+    #     else:
+    #         result = {"status": "error", "error": f"Unknown action: {action}"}
+    #         self.logger.info("Returning from handle_request (unknown action): %s", result)
+    #         return result
         
 
     def get_all_usernames(self):
@@ -460,7 +466,7 @@ class ChatServer:
         conn.close()
         return [row[0] for row in rows]
 
-    def handle_register(self, username, password):
+    def Register(self, username, password):
         """
         Register a new user account.
         
@@ -508,9 +514,9 @@ class ChatServer:
         conn.close()
         result = {"status": "ok", "message": "Registration successful"}
         self.logger.info("Returning from handle_register: %s", result)
-        return result
+        return chat_pb2.RegisterResponse(status=result["status"], message=result["message"])
 
-    def handle_login(self, username, password):
+    def Login(self, username, password):
         """
         Authenticate a user and create a session.
         
@@ -557,7 +563,7 @@ class ChatServer:
 
         result = {"status": "ok", "session_id": session_id, "unread_messages": unread_count}
         self.logger.info("Returning from handle_login: %s", result)
-        return result
+        return chat_pb2.LoginResponse(status=result["status"], session_id=result["session_id"], unread_messages=result["unread_messages"])
 
 
     def handle_message(self, session_id, from_user, to_user, msg):

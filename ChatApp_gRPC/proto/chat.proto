@@ -1,0 +1,138 @@
+syntax = "proto3";
+
+package chat;
+
+// The gRPC service definition
+service ChatService {
+  // --- Authentication ---
+  rpc Register (RegisterRequest) returns (RegisterResponse);
+  rpc Login (LoginRequest) returns (LoginResponse);
+
+  // --- Messaging ---
+  rpc SendMessage (SendMessageRequest) returns (SendMessageResponse);
+  rpc ReadMessages (ReadMessagesRequest) returns (ReadMessagesResponse);
+
+  // --- Searching for accounts ---
+  rpc ListAccounts (ListAccountsRequest) returns (ListAccountsResponse);
+
+  // --- Real-time message streaming ---
+  rpc Listen (ListenRequest) returns (stream ListenResponse);
+
+  // --- Message/Account deletion ---
+  rpc DeleteMessages (DeleteMessagesRequest) returns (DeleteMessagesResponse);
+  rpc DeleteAccount (DeleteAccountRequest) returns (DeleteAccountResponse);
+}
+
+// ---------- Messages ----------
+
+// Authentication
+message RegisterRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message RegisterResponse {
+  string status = 1;         // "ok", "error"
+  string message = 2;  // optional
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string status = 1;
+  string session_id = 2;
+  int32 unread_messages = 3; 
+  string error_message = 4;
+}
+
+// Messaging
+message SendMessageRequest {
+  string session_id = 1;
+  string from_user = 2;
+  string to_user = 3;
+  string content = 4;
+}
+
+message SendMessageResponse {
+  string status = 1;
+  string message = 2;
+  string error_message = 3;
+}
+
+message ReadMessagesRequest {
+  string session_id = 1;
+  string username = 2;
+  int32 count = 3;
+}
+
+message ReadMessagesResponse {
+  string status = 1;
+  repeated ChatMessage messages = 2; 
+  string error_message = 3;
+}
+
+message ChatMessage {
+  int32 id = 1;
+  string from_user = 2;
+  string content = 3;
+}
+
+// Searching
+message ListAccountsRequest {
+  string session_id = 1;
+  string pattern = 2; // wildcard pattern
+}
+
+message ListAccountsResponse {
+  string status = 1;
+  repeated string accounts = 2;
+  string error_message = 3;
+}
+
+// Real-time streaming
+message ListenRequest {
+  string session_id = 1;
+  string username = 2;
+}
+
+message ListenResponse {
+  string status = 1;
+  string from_user = 2;
+  string content = 3;
+  string error_message = 4;
+}
+
+// Message deletion
+message DeleteMessagesRequest {
+  string session_id = 1;
+  string from_user = 2;
+  repeated int32 message_ids = 3;
+}
+
+message DeleteMessagesResponse {
+  string status = 1;
+  string result_message = 2;
+  repeated ChatMessage remaining_messages = 3;
+  string error_message = 4;
+}
+
+// Account deletion
+message DeleteAccountRequest {
+  string session_id = 1;
+  string username = 2;
+}
+
+message DeleteAccountResponse {
+  string status = 1;
+  string message = 2;
+  string error_message = 3;
+}
+
+// ~/De/CS262/CS2620_C/CS262_DistributedSystems/ChatApp_gRPC copy *14 !2 ?3 ❯ python -m grpc_tools.protoc \                                                Py CS262_ChatApp 20:23:51
+//     --proto_path=./proto \
+//     --python_out=./proto_generated \
+//     --grpc_python_out=./proto_generated \
+//     ./proto/chat.proto
