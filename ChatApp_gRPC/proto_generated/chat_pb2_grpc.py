@@ -59,7 +59,7 @@ class ChatServiceStub(object):
                 '/chat.ChatService/ListAccounts',
                 request_serializer=chat__pb2.ListAccountsRequest.SerializeToString,
                 response_deserializer=chat__pb2.ListAccountsResponse.FromString,
-                _registered_method=True)
+                )
         self.DeleteMessages = channel.unary_unary(
                 '/chat.ChatService/DeleteMessages',
                 request_serializer=chat__pb2.DeleteMessagesRequest.SerializeToString,
@@ -69,12 +69,12 @@ class ChatServiceStub(object):
                 '/chat.ChatService/DeleteAccount',
                 request_serializer=chat__pb2.DeleteAccountRequest.SerializeToString,
                 response_deserializer=chat__pb2.DeleteAccountResponse.FromString,
-                _registered_method=True)
+                )
         self.Listen = channel.unary_stream(
                 '/chat.ChatService/Listen',
                 request_serializer=chat__pb2.ListenRequest.SerializeToString,
                 response_deserializer=chat__pb2.ListenResponse.FromString,
-                _registered_method=True)
+                )
 
 
 class ChatServiceServicer(object):
@@ -314,15 +314,8 @@ class ChatService(object):
             '/chat.ChatService/ListAccounts',
             chat__pb2.ListAccountsRequest.SerializeToString,
             chat__pb2.ListAccountsResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def DeleteMessages(request,
@@ -368,15 +361,8 @@ class ChatService(object):
             '/chat.ChatService/DeleteAccount',
             chat__pb2.DeleteAccountRequest.SerializeToString,
             chat__pb2.DeleteAccountResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def Listen(request,
@@ -389,18 +375,8 @@ class ChatService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(
-            request,
-            target,
-            '/chat.ChatService/Listen',
+        return grpc.experimental.unary_stream(request, target, '/chat.ChatService/Listen',
             chat__pb2.ListenRequest.SerializeToString,
             chat__pb2.ListenResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

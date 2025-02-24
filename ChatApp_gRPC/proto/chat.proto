@@ -63,6 +63,12 @@ message SendMessageRequest {
   string content = 4;
 }
 
+message PushObject {
+  string status = 1;
+  string from_user = 2;
+  string content = 3;
+}
+
 message SendMessageResponse {
   string status = 1;
   string content = 2;
@@ -138,9 +144,3 @@ message ListenResponse {
   string content = 3;
   string error = 4;
 }
-
-// python -m grpc_tools.protoc \
-//     --proto_path=./proto \
-//     --python_out=./proto_generated \
-//     --grpc_python_out=./proto_generated \
-//     ./proto/chat.proto

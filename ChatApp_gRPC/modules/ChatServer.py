@@ -76,14 +76,12 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
         self.setup_database()
         self.cert_file: str = cert_file
         self.key_file: str = key_file
-        
+
         # In-memory session storage: session_id -> username
         self.active_sessions: Dict[str, str] = {}
         # REAL-TIME MOD: Dictionary mapping usernames to their persistent listener connection data
         self.listeners: Dict[str, any] = {}
-
-        # Selector for handling concurrent I/O
-        self.sel: selectors.DefaultSelector = selectors.DefaultSelector()
+        self.listener_q = queue.Queue()
 
         # Set up logging
         self.log_file: str = log_file
@@ -92,7 +90,6 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
 
         # Whether the server is running
         self.running: bool = False
-
 
     def setup_logging(self):
         """
@@ -632,17 +629,18 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
             self.logger.info("Returning from SendMessage: %s", result)
             return chat_pb2.SendMessageResponse(status=result["status"], error=result["error"])
 
+    if to_user in self.listeners:
         if to_user in self.listeners:
             listener_data = self.listeners[to_user]
             try:
-                push_obj = {"status": "ok", "from_user": from_user, "message": msg}
-                self.queue_message(listener_data, push_obj)
+                push_obj = chat_pb2.PushObject(status="ok", from_user=from_user, content=msg)
+                self.listener_q.put(push_obj)
                 c.execute("UPDATE messages SET delivered=1 WHERE id=?", (message_id,))
                 conn.commit()
                 conn.close()
                 result = {"status": "ok", "message": f"Message delivered to {to_user} in real-time"}
                 self.logger.info("Returning from SendMessage: %s", result)
-                return chat_pb2.SendMessageResponse(status=result["status"], message=result["message"])
+                return chat_pb2.SendMessageResponse(status=result["status"], content=result["message"])
             except Exception as e:
                 self.logger.error(f"Real-time delivery failed: {str(e)}")
                 conn.close()
