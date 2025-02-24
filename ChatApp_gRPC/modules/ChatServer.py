@@ -78,6 +78,7 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         self.host: str = host
         self.port: int = port
         self.db_file: str = db_file
+        self.setup_database()
         self.cert_file: str = cert_file
         self.key_file: str = key_file
         
@@ -92,9 +93,11 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         # Set up logging
         self.log_file: str = log_file
         self.logger: logging.Logger = logging.getLogger(__name__)
+        self.setup_logging()
 
         # Whether the server is running
         self.running: bool = False
+
 
     def setup_logging(self):
         """
@@ -158,205 +161,205 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         conn.commit()
         conn.close()
 
-    def accept_wrapper(self, sock, context):
-        """
-        Accept and configure new client connections.
+    # def accept_wrapper(self, sock, context):
+    #     """
+    #     Accept and configure new client connections.
         
-        Args:
-            sock: The listening socket
-            context: The SSL context for TLS wrapping
+    #     Args:
+    #         sock: The listening socket
+    #         context: The SSL context for TLS wrapping
             
-        This method:
-        1. Accepts the new connection
-        2. Wraps it in TLS 
-        3. Sets it to non-blocking mode
-        4. Registers it with the selector
+    #     This method:
+    #     1. Accepts the new connection
+    #     2. Wraps it in TLS 
+    #     3. Sets it to non-blocking mode
+    #     4. Registers it with the selector
         
-        The connection data includes:
-        - addr: Client address
-        - inb: Input buffer
-        - outb: Output buffer
-        - handshake_complete: TLS handshake status
-        """
-        conn, addr = sock.accept()
-        self.logger.info(f"Accepted connection from {addr}")
-        try:
-            tls_conn = context.wrap_socket(conn, server_side=True, do_handshake_on_connect=False)
-        except ssl.SSLError as e:
-            self.logger.error("TLS handshake failed: %s", e)
-            conn.close()
-            return
+    #     The connection data includes:
+    #     - addr: Client address
+    #     - inb: Input buffer
+    #     - outb: Output buffer
+    #     - handshake_complete: TLS handshake status
+    #     """
+    #     conn, addr = sock.accept()
+    #     self.logger.info(f"Accepted connection from {addr}")
+    #     try:
+    #         tls_conn = context.wrap_socket(conn, server_side=True, do_handshake_on_connect=False)
+    #     except ssl.SSLError as e:
+    #         self.logger.error("TLS handshake failed: %s", e)
+    #         conn.close()
+    #         return
 
-        tls_conn.setblocking(False)
-        data = types.SimpleNamespace(
-            addr=addr, 
-            inb=b"", 
-            outb=b"", 
-            handshake_complete=False
-        )
+    #     tls_conn.setblocking(False)
+    #     data = types.SimpleNamespace(
+    #         addr=addr, 
+    #         inb=b"", 
+    #         outb=b"", 
+    #         handshake_complete=False
+    #     )
 
-        self.sel.register(tls_conn, selectors.EVENT_READ | selectors.EVENT_WRITE, data=data)
+    #     self.sel.register(tls_conn, selectors.EVENT_READ | selectors.EVENT_WRITE, data=data)
 
-    def service_connection(self, key, mask):
-        """
-        Handle I/O events on client connections.
+    # def service_connection(self, key, mask):
+    #     """
+    #     Handle I/O events on client connections.
         
-        Args:
-            key: The selector key containing socket and data
-            mask: The event mask indicating read/write events
+    #     Args:
+    #         key: The selector key containing socket and data
+    #         mask: The event mask indicating read/write events
             
-        This method:
-        1. Completes TLS handshake if needed
-        2. Handles read events by:
-           - Reading data from socket
-           - Processing complete messages
-           - Generating responses
-        3. Handles write events by:
-           - Sending queued outgoing data
+    #     This method:
+    #     1. Completes TLS handshake if needed
+    #     2. Handles read events by:
+    #        - Reading data from socket
+    #        - Processing complete messages
+    #        - Generating responses
+    #     3. Handles write events by:
+    #        - Sending queued outgoing data
            
-        Uses WireMessageBinary for message encoding/decoding.
-        """
-        tls_conn = key.fileobj
-        data = key.data
+    #     Uses WireMessageBinary for message encoding/decoding.
+    #     """
+    #     tls_conn = key.fileobj
+    #     data = key.data
 
-        # Complete the TLS handshake if needed.
-        if not data.handshake_complete and not self._complete_handshake(tls_conn, data):
-            return
+    #     # Complete the TLS handshake if needed.
+    #     if not data.handshake_complete and not self._complete_handshake(tls_conn, data):
+    #         return
 
-        if mask & selectors.EVENT_READ:
-            self._handle_read(tls_conn, data, key)
+    #     if mask & selectors.EVENT_READ:
+    #         self._handle_read(tls_conn, data, key)
 
-        if mask & selectors.EVENT_WRITE:
-            self._handle_write(tls_conn, data)
+    #     if mask & selectors.EVENT_WRITE:
+    #         self._handle_write(tls_conn, data)
 
-    def _complete_handshake(self, tls_conn: socket.socket, data) -> bool:
-        """
-        Complete the TLS handshake for a connection.
+    # def _complete_handshake(self, tls_conn: socket.socket, data) -> bool:
+    #     """
+    #     Complete the TLS handshake for a connection.
         
-        Args:
-            tls_conn: The TLS wrapped socket
-            data: Connection data object
+    #     Args:
+    #         tls_conn: The TLS wrapped socket
+    #         data: Connection data object
             
-        Returns:
-            bool: True if handshake completed, False if more I/O needed
+    #     Returns:
+    #         bool: True if handshake completed, False if more I/O needed
             
-        This method handles the non-blocking TLS handshake process,
-        dealing with WantReadError/WantWriteError conditions.
-        """
-        try:
-            tls_conn.do_handshake()
-            data.handshake_complete = True
-            self.logger.debug(f"Handshake complete for {data.addr}")
-            return True
-        except (ssl.SSLWantReadError, ssl.SSLWantWriteError):
-            # Handshake is still in progress.
-            return False
-        except (OSError, ssl.SSLError) as e:
-            self._close_connection(tls_conn, data, f"TLS handshake failed: {e}")
-            return False
+    #     This method handles the non-blocking TLS handshake process,
+    #     dealing with WantReadError/WantWriteError conditions.
+    #     """
+    #     try:
+    #         tls_conn.do_handshake()
+    #         data.handshake_complete = True
+    #         self.logger.debug(f"Handshake complete for {data.addr}")
+    #         return True
+    #     except (ssl.SSLWantReadError, ssl.SSLWantWriteError):
+    #         # Handshake is still in progress.
+    #         return False
+    #     except (OSError, ssl.SSLError) as e:
+    #         self._close_connection(tls_conn, data, f"TLS handshake failed: {e}")
+    #         return False
 
-    def _handle_read(self, tls_conn: socket.socket, data, key) -> None:
-        """
-        Process incoming data from a client connection.
+    # def _handle_read(self, tls_conn: socket.socket, data, key) -> None:
+    #     """
+    #     Process incoming data from a client connection.
         
-        Args:
-            tls_conn: The TLS wrapped socket
-            data: Connection data object
-            key: Selector key
+    #     Args:
+    #         tls_conn: The TLS wrapped socket
+    #         data: Connection data object
+    #         key: Selector key
             
-        This method:
-        1. Reads raw data from the socket
-        2. Buffers incomplete messages
-        3. Processes complete messages by:
-           - Extracting length-prefixed messages
-           - Parsing binary wire format
-           - Dispatching to appropriate handler
-           - Queueing responses
-        """
-        try:
-            recv_data = tls_conn.recv(4096)  # Read up to 4KB
-        except ssl.SSLWantReadError:
-            return
-        except ssl.SSLError as e:
-            self._close_connection(tls_conn, data, f"TLS read error: {e}")
-            return
-        except ConnectionResetError:
-            recv_data = None
+    #     This method:
+    #     1. Reads raw data from the socket
+    #     2. Buffers incomplete messages
+    #     3. Processes complete messages by:
+    #        - Extracting length-prefixed messages
+    #        - Parsing binary wire format
+    #        - Dispatching to appropriate handler
+    #        - Queueing responses
+    #     """
+    #     try:
+    #         recv_data = tls_conn.recv(4096)  # Read up to 4KB
+    #     except ssl.SSLWantReadError:
+    #         return
+    #     except ssl.SSLError as e:
+    #         self._close_connection(tls_conn, data, f"TLS read error: {e}")
+    #         return
+    #     except ConnectionResetError:
+    #         recv_data = None
 
-        if recv_data:
-            data.inb += recv_data
-        else:
-            self._close_connection(tls_conn, data, f"Closing connection to {data.addr}")
-            return
+    #     if recv_data:
+    #         data.inb += recv_data
+    #     else:
+    #         self._close_connection(tls_conn, data, f"Closing connection to {data.addr}")
+    #         return
 
-        # Process all complete (length-prefixed) messages in the input buffer.
-        while True:
-            if len(data.inb) < 4:
-                break
+    #     # Process all complete (length-prefixed) messages in the input buffer.
+    #     while True:
+    #         if len(data.inb) < 4:
+    #             break
 
-            msg_len = int.from_bytes(data.inb[:4], "big")
-            if len(data.inb) < 4 + msg_len:
-                break
+    #         msg_len = int.from_bytes(data.inb[:4], "big")
+    #         if len(data.inb) < 4 + msg_len:
+    #             break
 
-            raw_msg = data.inb[4:4+msg_len]
-            data.inb = data.inb[4+msg_len:]
+    #         raw_msg = data.inb[4:4+msg_len]
+    #         data.inb = data.inb[4+msg_len:]
 
-            try:
-                request_obj = WireMessageBinary.parse_wire_message(raw_msg)
-            except Exception as e:
-                error_response = {"status": "error", "error": f"Dict parse error: {str(e)}"}
-                self.queue_message(data, error_response)
-                continue
+    #         try:
+    #             request_obj = WireMessageBinary.parse_wire_message(raw_msg)
+    #         except Exception as e:
+    #             error_response = {"status": "error", "error": f"Dict parse error: {str(e)}"}
+    #             self.queue_message(data, error_response)
+    #             continue
 
-            response_obj = self.handle_request(request_obj, key) # This is where the request is handled.
-            response_bytes = WireMessageBinary.encode_message(response_obj)
-            data.outb += response_bytes
+    #         response_obj = self.handle_request(request_obj, key) # This is where the request is handled.
+    #         response_bytes = WireMessageBinary.encode_message(response_obj)
+    #         data.outb += response_bytes
 
-    def _handle_write(self, tls_conn: socket.socket, data) -> None:
-        """
-        Send queued outgoing data to a client.
+    # def _handle_write(self, tls_conn: socket.socket, data) -> None:
+    #     """
+    #     Send queued outgoing data to a client.
         
-        Args:
-            tls_conn: The TLS wrapped socket
-            data: Connection data object
+    #     Args:
+    #         tls_conn: The TLS wrapped socket
+    #         data: Connection data object
             
-        Handles non-blocking sends and TLS-specific write conditions.
-        Removes sent data from the outgoing buffer.
-        """
-        if data.outb:
-            try:
-                sent = tls_conn.send(data.outb)
-                data.outb = data.outb[sent:]
-            except ssl.SSLWantWriteError:
-                return
-            except ssl.SSLError as e:
-                self._close_connection(tls_conn, data, f"TLS write error: {e}")
+    #     Handles non-blocking sends and TLS-specific write conditions.
+    #     Removes sent data from the outgoing buffer.
+    #     """
+    #     if data.outb:
+    #         try:
+    #             sent = tls_conn.send(data.outb)
+    #             data.outb = data.outb[sent:]
+    #         except ssl.SSLWantWriteError:
+    #             return
+    #         except ssl.SSLError as e:
+    #             self._close_connection(tls_conn, data, f"TLS write error: {e}")
 
-    def _close_connection(self, tls_conn: socket.socket, data, error_message: str) -> None:
-        """
-        Clean up and close a client connection.
+    # def _close_connection(self, tls_conn: socket.socket, data, error_message: str) -> None:
+    #     """
+    #     Clean up and close a client connection.
         
-        Args:
-            tls_conn: The TLS wrapped socket to close
-            data: Connection data object
-            error_message: Message to log
+    #     Args:
+    #         tls_conn: The TLS wrapped socket to close
+    #         data: Connection data object
+    #         error_message: Message to log
             
-        This method:
-        1. Removes any persistent listener registration
-        2. Logs the closure reason
-        3. Unregisters from the selector
-        4. Closes the socket
-        """
-        if hasattr(data, 'username'):
-            if data.username in self.listeners and self.listeners[data.username] is data:
-                del self.listeners[data.username]
-        # Log as INFO if the message indicates a normal connection close.
-        if error_message.startswith("Closing connection"):
-            self.logger.info(error_message)
-        else:
-            self.logger.error(error_message)
-        self.sel.unregister(tls_conn)
-        tls_conn.close()
+    #     This method:
+    #     1. Removes any persistent listener registration
+    #     2. Logs the closure reason
+    #     3. Unregisters from the selector
+    #     4. Closes the socket
+    #     """
+    #     if hasattr(data, 'username'):
+    #         if data.username in self.listeners and self.listeners[data.username] is data:
+    #             del self.listeners[data.username]
+    #     # Log as INFO if the message indicates a normal connection close.
+    #     if error_message.startswith("Closing connection"):
+    #         self.logger.info(error_message)
+    #     else:
+    #         self.logger.error(error_message)
+    #     self.sel.unregister(tls_conn)
+    #     tls_conn.close()
 
     def queue_message(self, data, response_obj) -> None:
         """
@@ -913,38 +916,55 @@ class ChatServerServicer(chat_pb2_grpc.ChatServiceServicer):
         self.logger.info("Returning from handle_delete_account: %s", result)
         return chat_pb2.DeleteAccountResponse(status=result["status"], content=result["content"])
 
-    def start(self):
-        self.setup_logging()
-        self.logger.info("Starting the server...")
-        self.logger.debug("About to call setup_database()")
-        self.setup_database()
+def serve():
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    add_ChatServiceServicer_to_server(ChatServiceServicer(), server)
+    server.add_insecure_port('[::]:54401')
+    server.start()
 
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        context.load_cert_chain(certfile=self.cert_file, keyfile=self.key_file)
+    try:
+        server.wait_for_termination()
+    except KeyboardInterrupt:
+        print("Server stopping...")
+        server.stop(grace=None)  # or some grace period in seconds
 
-        self.running = True
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as lsock:
-            # Enable address reuse to prevent "Address already in use" errors.
-            lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            lsock.bind((self.host, self.port))
-            lsock.listen()
-            self.logger.debug(f"Listening on {self.host}:{self.port}")
-            lsock.setblocking(False)
-            self.sel.register(lsock, selectors.EVENT_READ, data=None)
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    serve()
 
-            try:
-                while self.running:
-                    events = self.sel.select(timeout=None)
-                    for key, mask in events:
-                        if key.data is None:
-                            self.accept_wrapper(key.fileobj, context)
-                        else:
-                            self.service_connection(key, mask)
-            except KeyboardInterrupt:
-                self.logger.info("Caught keyboard interrupt, exiting")
-            finally:
-                self.sel.close()
+    # def start(self):
+    #     self.setup_logging()
+    #     self.logger.info("Starting the server...")
+    #     self.logger.debug("About to call setup_database()")
+    #     self.setup_database()
 
-    def stop(self):
-        self.logger.info("Stopping the server...")
-        self.running = False
+    #     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    #     context.load_cert_chain(certfile=self.cert_file, keyfile=self.key_file)
+
+    #     self.running = True
+    #     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as lsock:
+    #         # Enable address reuse to prevent "Address already in use" errors.
+    #         lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    #         lsock.bind((self.host, self.port))
+    #         lsock.listen()
+    #         self.logger.debug(f"Listening on {self.host}:{self.port}")
+    #         lsock.setblocking(False)
+    #         self.sel.register(lsock, selectors.EVENT_READ, data=None)
+
+    #         try:
+    #             while self.running:
+    #                 events = self.sel.select(timeout=None)
+    #                 for key, mask in events:
+    #                     if key.data is None:
+    #                         self.accept_wrapper(key.fileobj, context)
+    #                     else:
+    #                         self.service_connection(key, mask)
+    #         except KeyboardInterrupt:
+    #             self.logger.info("Caught keyboard interrupt, exiting")
+    #         finally:
+    #             self.sel.close()
+
+
+    # def stop(self):
+    #     self.logger.info("Stopping the server...")
+    #     self.running = False
