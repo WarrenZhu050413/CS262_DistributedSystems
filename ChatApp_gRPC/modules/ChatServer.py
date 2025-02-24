@@ -80,8 +80,7 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
         # In-memory session storage: session_id -> username
         self.active_sessions: Dict[str, str] = {}
         # REAL-TIME MOD: Dictionary mapping usernames to their persistent listener connection data
-        self.listeners: Dict[str, any] = {}
-        self.listener_q = queue.Queue()
+        self.listeners: Dict[str, queue.Queue] = {}
 
         # Set up logging
         self.log_file: str = log_file
@@ -629,7 +628,6 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
             self.logger.info("Returning from SendMessage: %s", result)
             return chat_pb2.SendMessageResponse(status=result["status"], error=result["error"])
 
-    if to_user in self.listeners:
         if to_user in self.listeners:
             listener_data = self.listeners[to_user]
             try:
@@ -909,6 +907,40 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
         self.logger.info("Returning from DeleteAccount: %s", result)
         return chat_pb2.DeleteAccountResponse(status=result["status"], content=result["content"])
 
+    def Listen(self, request, context):
+        # Validate session, ensure request.username matches a valid session, etc.
+        username = request.username
+        session_id = request.session_id
+        if session_id not in self.active_sessions or \
+           self.active_sessions[session_id] != username:
+            context.set_code(grpc.StatusCode.UNAUTHENTICATED)
+            context.set_details("Invalid session.")
+            return  # Ends the stream immediately.
+
+        # Create a queue so we can push messages from SendMessage
+        # or anywhere else. The Listen method will yield from that queue.
+        q = queue.Queue()
+        self.listeners[username] = q
+
+        try:
+            while True:
+                # If the client disappears or cancels, context.is_active() becomes False
+                if not context.is_active():
+                    break
+
+                # Block until we get a new ChatMessage or a sentinel to close
+                try:
+                    msg = q.get(timeout=1.0)  # or some short timeout
+                except queue.Empty:
+                    continue
+
+                # 'msg' should be a chat_pb2.ChatMessage
+                yield msg
+
+        finally:
+            # Clean up if the client stops listening
+            if username in self.listeners and self.listeners[username] == q:
+                del self.listeners[username]
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     add_ChatServiceServicer_to_server(ChatServiceServicer(), server)

@@ -14,6 +14,7 @@ class ChatClient:
     Handles sending requests, managing sessions, and maintaining a persistent 
     connection for real-time message delivery.
     """
+
     def __init__(self, host: str, port: int, cafile: str) -> None:
         """
         Initialize a new ChatClient instance.
@@ -33,6 +34,10 @@ class ChatClient:
         self.context.check_hostname = False
         self.context.verify_mode = ssl.CERT_NONE
 
+        # Create a channel to the gRPC server.
+        channel = grpc.insecure_channel(f"{self.host}:{self.port}")
+        self.stub = chat_pb2_grpc.ChatServiceStub(channel)
+
         # NEW: Attributes to manage the persistent listener.
         self.listener_thread = None
         self.listener_socket = None
@@ -51,87 +56,84 @@ class ChatClient:
         Returns:
             Dict[str, Any]: The server's response as a dictionary
         """
-        # Create a channel to the gRPC server.
-        with grpc.insecure_channel(f"{self.host}:{self.port}") as channel:
-            stub = chat_pb2_grpc.ChatServiceStub(channel)
 
-            if action == "register":
-                request = chat_pb2.RegisterRequest(username=from_user, password=password)
-                response = stub.Register(request)
-                return {"status": response.status, "content": response.content}
+        if action == "register":
+            request = chat_pb2.RegisterRequest(username=from_user, password=password)
+            response = stub.Register(request)
+            return {"status": response.status, "content": response.content}
 
-            elif action == "login":
-                request = chat_pb2.LoginRequest(username=from_user, password=password)
-                response = stub.Login(request)
-                # Save session_id if provided
-                if response.session_id:
-                    self.session_id = response.session_id
-                return {
-                    "status": response.status,
-                    "session_id": response.session_id,
-                    "unread_messages": response.unread_messages,
-                    "error": response.error
-                }
+        elif action == "login":
+            request = chat_pb2.LoginRequest(username=from_user, password=password)
+            response = stub.Login(request)
+            # Save session_id if provided
+            if response.session_id:
+                self.session_id = response.session_id
+            return {
+                "status": response.status,
+                "session_id": response.session_id,
+                "unread_messages": response.unread_messages,
+                "error": response.error
+            }
 
-            elif action == "send_message":
-                request = chat_pb2.SendMessageRequest(
-                    session_id=self.session_id,
-                    from_user=from_user,
-                    to_user=to_user,
-                    content=msg
-                )
-                response = stub.SendMessage(request)
-                return {"status": response.status, "content": response.content, "error": response.error}
+        elif action == "send_message":
+            request = chat_pb2.SendMessageRequest(
+                session_id=self.session_id,
+                from_user=from_user,
+                to_user=to_user,
+                content=msg
+            )
+            response = stub.SendMessage(request)
+            return {"status": response.status, "content": response.content, "error": response.error}
 
-            elif action == "read_messages":
-                request = chat_pb2.ReadMessagesRequest(
-                    session_id=self.session_id,
-                    from_user=from_user,
-                    count=int(msg)  # TODO: assuming msg is used to indicate the count
-                )
-                response = stub.ReadMessages(request)
-                # You might want to convert the list of ChatMessage objects into dicts
-                messages = [{"id": m.id, "from_user": m.from_user, "content": m.content} for m in response.messages]
-                return {"status": response.status, "messages": messages, "error": response.error}
+        elif action == "read_messages":
+            request = chat_pb2.ReadMessagesRequest(
+                session_id=self.session_id,
+                from_user=from_user,
+                count=int(msg)  # TODO: assuming msg is used to indicate the count
+            )
+            response = stub.ReadMessages(request)
+            # You might want to convert the list of ChatMessage objects into dicts
+            messages = [{"id": m.id, "from_user": m.from_user, "content": m.content} for m in response.messages]
+            return {"status": response.status, "messages": messages, "error": response.error}
 
-            elif action == "list_accounts":
-                request = chat_pb2.ListAccountsRequest(
-                    session_id=self.session_id,
-                    pattern=msg  # using msg as the search pattern
-                )
-                response = stub.ListAccounts(request)
-                # TODO: parse this list like read_messages?
-                return {"status": response.status, "accounts": list(response.accounts), "error": response.error}
+        elif action == "list_accounts":
+            request = chat_pb2.ListAccountsRequest(
+                session_id=self.session_id,
+                pattern=msg  # using msg as the search pattern
+            )
+            response = stub.ListAccounts(request)
+            # TODO: parse this list like read_messages?
+            return {"status": response.status, "accounts": list(response.accounts), "error": response.error}
 
-            elif action == "delete_messages":
-                # In this case, you may need to adjust how you pass multiple message IDs.
-                # Here, we assume 'msg' is a comma-separated string of message IDs.
-                message_ids = [int(mid) for mid in msg.split(',')]
-                request = chat_pb2.DeleteMessagesRequest(
-                    session_id=self.session_id,
-                    from_user=from_user,
-                    message_ids=message_ids
-                )
-                response = stub.DeleteMessages(request)
-                # Process messages similarly to read_messages.
-                messages_list = [{"id": m.id, "from_user": m.from_user, "content": m.content} for m in response.messages]
-                return {
-                    "status": response.status,
-                    "content": response.content,
-                    "messages": messages_list,
-                    "error": response.error
-                }
+        elif action == "delete_messages":
+            # In this case, you may need to adjust how you pass multiple message IDs.
+            # Here, we assume 'msg' is a comma-separated string of message IDs.
+            message_ids = [int(mid) for mid in msg.split(',')]
+            request = chat_pb2.DeleteMessagesRequest(
+                session_id=self.session_id,
+                from_user=from_user,
+                message_ids=message_ids
+            )
+            response = stub.DeleteMessages(request)
+            # Process messages similarly to read_messages.
+            messages_list = [{"id": m.id, "from_user": m.from_user, "content": m.content} for m in response.messages]
+            return {
+                "status": response.status,
+                "content": response.content,
+                "messages": messages_list,
+                "error": response.error
+            }
 
-            elif action == "delete_account":
-                request = chat_pb2.DeleteAccountRequest(
-                    session_id=self.session_id,
-                    username=from_user
-                )
-                response = stub.DeleteAccount(request)
-                return {"status": response.status, "content": response.content, "error": response.error}
+        elif action == "delete_account":
+            request = chat_pb2.DeleteAccountRequest(
+                session_id=self.session_id,
+                username=from_user
+            )
+            response = stub.DeleteAccount(request)
+            return {"status": response.status, "content": response.content, "error": response.error}
 
-            else:
-                raise ValueError("Unsupported action")
+        else:
+            raise ValueError("Unsupported action")
 
             
     # def delete_account(self, username):
@@ -164,69 +166,32 @@ class ChatClient:
     # ------------------------------
     # NEW: Persistent listener for real-time messages
     # ------------------------------
-    def start_listener(self, from_user: str, callback) -> None:
+    def start_listener(self, username, session_id, callback):
         """
-        Start a background thread that listens for real-time messages from the server.
-
-        Creates a persistent connection to receive pushed messages and calls the callback
-        function whenever a new message arrives.
-
-        Args:
-            from_user (str): The username to listen for messages for
-            callback (callable): Function to call with received message dictionaries
+        Spawns a background thread which calls the server-streaming RPC Listen()
+        and fires 'callback(message)' whenever a new ChatMessage arrives.
         """
-        def listen_thread():
-            s = None
+        def run_listen():
+            request = chat_pb2.ListenRequest(
+                username=username,
+                session_id=session_id
+            )
             try:
-                # Create and connect the raw socket.
-                raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                raw_socket.connect((self.host, self.port))
-                # Wrap the raw socket in SSL.
-                s = self.context.wrap_socket(raw_socket, server_side=False, server_hostname=self.host)
-                # Save the socket so it can be closed later.
-                self.listener_socket = s
-
-                # Build and send the listen request.
-                listen_wire_message: bytes = WireMessageBinary.make_wire_message(
-                    action="listen",
-                    from_user=from_user,
-                    to_user="",
-                    password="",
-                    msg="",
-                    session_id=self.session_id
-                )
-                s.sendall(listen_wire_message)
-                try:
-                    # Read the server's acknowledgement.
-                    resp_bytes: bytes = WireMessageBinary.read_wire_message(s)
-                except Exception as e:
-                    return  # Exit if reading acknowledgement fails
-
-                # Now keep reading pushed messages indefinitely.
-                while True:
-                    try:
-                        msg_bytes = WireMessageBinary.read_wire_message(s)
-                    except Exception as e:
-                        break  # Exit loop if an error occurs (or if the socket is closed)
-                    msg_dict = WireMessageBinary.parse_wire_message(msg_bytes)
-                    callback(msg_dict)
-            except Exception as e:
-                callback({"status": "error", "error": str(e)})
-            finally:
-                if s is not None:
-                    try:
-                        s.shutdown(socket.SHUT_RDWR)
-                    except Exception:
-                        pass
-                    s.close()
-                    self.listener_socket = None
-        self.listener_thread = threading.Thread(target=listen_thread, daemon=True)
+                for chat_msg in self.stub.Listen(request):
+                    # 'chat_msg' is a ChatMessage from the server
+                    # Call the callback with the new message
+                    callback(chat_msg)
+            except grpc.RpcError as e:
+                # If the server disconnects or there's an error, handle it
+                print("Listener thread ended:", e)
+        
+        self.listener_thread = threading.Thread(target=run_listen, daemon=True)
         self.listener_thread.start()
 
-    def stop_listener(self):
-        """
-        Stop the background listener thread and close its connection.
-        """
-        if self.listener_socket is not None:
-            self.listener_socket.close()
-            self.listener_socket = None
+    # def stop_listener(self):
+    #     """
+    #     Stop the background listener thread and close its connection.
+    #     """
+    #     if self.listener_socket is not None:
+    #         self.listener_socket.close()
+    #         self.listener_socket = None
