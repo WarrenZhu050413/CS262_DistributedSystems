@@ -1,5 +1,10 @@
 syntax = "proto3";
 
+// Notes:
+// 1. We choose to use the optional keyword to indicate that a field may or may not be present.
+// Problem with using message as the field name as it clashes with a keyword
+
+
 package chat;
 
 // The gRPC service definition
@@ -15,12 +20,12 @@ service ChatService {
   // --- Searching for accounts ---
   rpc ListAccounts (ListAccountsRequest) returns (ListAccountsResponse);
 
-  // --- Real-time message streaming ---
-  rpc Listen (ListenRequest) returns (stream ListenResponse);
-
   // --- Message/Account deletion ---
   rpc DeleteMessages (DeleteMessagesRequest) returns (DeleteMessagesResponse);
   rpc DeleteAccount (DeleteAccountRequest) returns (DeleteAccountResponse);
+
+  // --- Real-time message streaming ---
+  rpc Listen (ListenRequest) returns (stream ListenResponse);
 }
 
 // ---------- Messages ----------
@@ -33,7 +38,8 @@ message RegisterRequest {
 
 message RegisterResponse {
   string status = 1;         // "ok", "error"
-  string message = 2;  // optional
+  optional string error = 2;  // optional
+  optional string content = 3;  // optional
 }
 
 message LoginRequest {
@@ -44,8 +50,8 @@ message LoginRequest {
 message LoginResponse {
   string status = 1;
   string session_id = 2;
-  int32 unread_messages = 3; 
-  string error_message = 4;
+  optional int32 unread_messages = 3; 
+  optional string error = 4;
 }
 
 // Messaging
@@ -58,20 +64,20 @@ message SendMessageRequest {
 
 message SendMessageResponse {
   string status = 1;
-  string message = 2;
-  string error_message = 3;
+  string content = 2;
+  string error = 3;
 }
 
 message ReadMessagesRequest {
   string session_id = 1;
-  string username = 2;
+  string from_user = 2;
   int32 count = 3;
 }
 
 message ReadMessagesResponse {
   string status = 1;
   repeated ChatMessage messages = 2; 
-  string error_message = 3;
+  string error = 3;
 }
 
 message ChatMessage {
@@ -89,7 +95,34 @@ message ListAccountsRequest {
 message ListAccountsResponse {
   string status = 1;
   repeated string accounts = 2;
-  string error_message = 3;
+  string error = 3;
+}
+
+
+// Message deletion
+message DeleteMessagesRequest {
+  string session_id = 1;
+  string from_user = 2;
+  repeated int32 message_ids = 3;
+}
+
+message DeleteMessagesResponse {
+  string status = 1;
+  optional string content = 2;
+  optional repeated ChatMessage messages = 3;
+  optional string error = 4;
+}
+
+// Account deletion
+message DeleteAccountRequest {
+  string session_id = 1;
+  string username = 2;
+}
+
+message DeleteAccountResponse {
+  string status = 1;
+  string message = 2;
+  string error = 3;
 }
 
 // Real-time streaming
@@ -102,33 +135,7 @@ message ListenResponse {
   string status = 1;
   string from_user = 2;
   string content = 3;
-  string error_message = 4;
-}
-
-// Message deletion
-message DeleteMessagesRequest {
-  string session_id = 1;
-  string from_user = 2;
-  repeated int32 message_ids = 3;
-}
-
-message DeleteMessagesResponse {
-  string status = 1;
-  string result_message = 2;
-  repeated ChatMessage remaining_messages = 3;
-  string error_message = 4;
-}
-
-// Account deletion
-message DeleteAccountRequest {
-  string session_id = 1;
-  string username = 2;
-}
-
-message DeleteAccountResponse {
-  string status = 1;
-  string message = 2;
-  string error_message = 3;
+  string error = 4;
 }
 
 // ~/De/CS262/CS2620_C/CS262_DistributedSystems/ChatApp_gRPC copy *14 !2 ?3 ❯ python -m grpc_tools.protoc \                                                Py CS262_ChatApp 20:23:51
