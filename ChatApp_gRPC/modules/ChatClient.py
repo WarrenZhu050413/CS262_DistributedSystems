@@ -59,12 +59,12 @@ class ChatClient:
 
         if action == "register":
             request = chat_pb2.RegisterRequest(username=from_user, password=password)
-            response = stub.Register(request)
+            response = self.stub.Register(request)
             return {"status": response.status, "content": response.content}
 
         elif action == "login":
             request = chat_pb2.LoginRequest(username=from_user, password=password)
-            response = stub.Login(request)
+            response = self.stub.Login(request)
             # Save session_id if provided
             if response.session_id:
                 self.session_id = response.session_id
@@ -82,7 +82,7 @@ class ChatClient:
                 to_user=to_user,
                 content=msg
             )
-            response = stub.SendMessage(request)
+            response = self.stub.SendMessage(request)
             return {"status": response.status, "content": response.content, "error": response.error}
 
         elif action == "read_messages":
@@ -91,7 +91,7 @@ class ChatClient:
                 from_user=from_user,
                 count=int(msg)  # TODO: assuming msg is used to indicate the count
             )
-            response = stub.ReadMessages(request)
+            response = self.stub.ReadMessages(request)
             # You might want to convert the list of ChatMessage objects into dicts
             messages = [{"id": m.id, "from_user": m.from_user, "content": m.content} for m in response.messages]
             return {"status": response.status, "messages": messages, "error": response.error}
@@ -101,7 +101,7 @@ class ChatClient:
                 session_id=self.session_id,
                 pattern=msg  # using msg as the search pattern
             )
-            response = stub.ListAccounts(request)
+            response = self.stub.ListAccounts(request)
             # TODO: parse this list like read_messages?
             return {"status": response.status, "accounts": list(response.accounts), "error": response.error}
 
@@ -114,7 +114,7 @@ class ChatClient:
                 from_user=from_user,
                 message_ids=message_ids
             )
-            response = stub.DeleteMessages(request)
+            response = self.stub.DeleteMessages(request)
             # Process messages similarly to read_messages.
             messages_list = [{"id": m.id, "from_user": m.from_user, "content": m.content} for m in response.messages]
             return {
@@ -129,7 +129,7 @@ class ChatClient:
                 session_id=self.session_id,
                 username=from_user
             )
-            response = stub.DeleteAccount(request)
+            response = self.stub.DeleteAccount(request)
             return {"status": response.status, "content": response.content, "error": response.error}
 
         else:
