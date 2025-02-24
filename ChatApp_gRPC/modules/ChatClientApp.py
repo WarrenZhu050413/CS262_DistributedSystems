@@ -389,7 +389,14 @@ class ChatClientApp:
             return
 
         try:
-            resp_dict: Dict[str, Any] = self.client.delete_account(username)
+            # resp_dict: Dict[str, Any] = self.client.delete_account(username)
+            resp_dict: Dict[str, Any] = self.client.send_request(
+                action="delete_account",
+                from_user=self.from_var.get().strip(),
+                to_user="",
+                password=self.password_var.get().strip(),
+                msg=""
+            )
             if resp_dict.get("status") == "ok":
                 self.response_label.config(text="Account has been deleted, close app to finish.")
             else:

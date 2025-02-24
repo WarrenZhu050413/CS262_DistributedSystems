@@ -110,7 +110,7 @@ message DeleteMessagesRequest {
 message DeleteMessagesResponse {
   string status = 1;
   optional string content = 2;
-  optional repeated ChatMessage messages = 3;
+  repeated ChatMessage messages = 3;
   optional string error = 4;
 }
 
@@ -139,7 +139,7 @@ message ListenResponse {
   string error = 4;
 }
 
-// ~/De/CS262/CS2620_C/CS262_DistributedSystems/ChatApp_gRPC copy *14 !2 ?3 ❯ python -m grpc_tools.protoc \                                                Py CS262_ChatApp 20:23:51
+// python -m grpc_tools.protoc \
 //     --proto_path=./proto \
 //     --python_out=./proto_generated \
 //     --grpc_python_out=./proto_generated \
