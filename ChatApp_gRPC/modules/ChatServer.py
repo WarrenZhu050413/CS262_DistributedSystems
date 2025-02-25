@@ -6,8 +6,9 @@ import bcrypt
 import ssl
 import queue
 import logging
-from generated import chat_pb2, chat_pb2_grpc
-from proto_generated.chat_pb2_grpc import add_ChatServiceServicer_to_server
+from ChatApp_gRPC.proto_generated import chat_pb2
+from ChatApp_gRPC.proto_generated import chat_pb2_grpc
+from ChatApp_gRPC.proto_generated.chat_pb2_grpc import add_ChatServiceServicer_to_server
 
 # Changed message_list into a protobuf list of ChatMessage objects.
 # Changed name to ChatServiceServicer.

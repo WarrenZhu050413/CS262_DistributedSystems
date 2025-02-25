@@ -2,10 +2,9 @@ import socket
 import ssl
 import threading  # REAL-TIME MOD: Needed for the listener thread
 from typing import Dict, Any, Optional
-from .WireMessageBinary import WireMessageBinary
 import grpc
-import chat_pb2
-import chat_pb2_grpc
+from ChatApp_gRPC.proto_generated import chat_pb2
+from ChatApp_gRPC.proto_generated import chat_pb2_grpc
 
 class ChatClient:
     """

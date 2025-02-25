@@ -1,7 +1,8 @@
 import tkinter as tk
 from typing import Dict, Any, Optional
-from .config import HOST, PORT
-from .ChatClient import ChatClient
+from ChatApp_gRPC.modules.config import HOST, PORT
+from ChatApp_gRPC.modules.ChatClient import ChatClient
+from ChatApp_gRPC.proto_generated import chat_pb2
 
 class ChatClientApp:
     """
