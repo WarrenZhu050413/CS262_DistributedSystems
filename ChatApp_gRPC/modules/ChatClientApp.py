@@ -176,7 +176,7 @@ class ChatClientApp:
         Handle send message button click event.
         Sets the action to 'message' and invokes the send click handler.
         """
-        self.action_var.set("message")
+        self.action_var.set("send_message")
         self.on_send_click()
 
     def on_send_click(self) -> None:
@@ -202,8 +202,8 @@ class ChatClientApp:
                 action, from_user, to_user, password, msg
             )
             self.response_label.config(text=f"Server responded with dict:\n{resp_dict}")
-            # If the action is "message", display the sent message in the message box.
-            if action == "message":
+            # If the action is "send_message", display the sent message in the message box.
+            if action == "send_message":
                 self._append_incoming_messages(f"To {to_user}: {msg}\n")
                 # Optionally, clear the message entry field after sending.
                 self.message_var.set("")
@@ -359,7 +359,7 @@ class ChatClientApp:
                 msg=msg_ids_str
             )
             if resp_dict.get("status") == "ok":
-                self.response_label.config(text=resp_dict.get("message", "Messages deleted."))
+                self.response_label.config(text=resp_dict.get("content", "Messages deleted."))
                 # Refresh the incoming messages text widget with the remaining messages.
                 self.incoming_messages_text.config(state="normal")
                 self.incoming_messages_text.delete(1.0, tk.END)
@@ -433,11 +433,12 @@ class ChatClientApp:
         from_user = msg_pushed.from_user
         content = msg_pushed.content
         def update_gui():
-            if status == "ok" and "message" in msg_dict and "from_user" in msg_dict:
+            if status == "ok":
                 self._append_incoming_messages(f"From {from_user}: {content}\n")
                 print("printing msg_pushed")
                 print(msg_pushed)
             elif status == "error":
+                error = msg_pushed.error
                 self._append_incoming_messages(f"Real-time error: {error}\n")
             else:
                 self._append_incoming_messages(f"Real-time: {content}\n")

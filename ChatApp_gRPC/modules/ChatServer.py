@@ -340,7 +340,7 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
             return chat_pb2.SendMessageResponse(status=result["status"], error=result["error"])
 
         if to_user in self.listeners:
-            listener_data = self.listeners[to_user]
+            # listener_data = self.listeners[to_user]
             try:
                 push_obj = chat_pb2.PushObject(status="ok", from_user=from_user, content=msg)
                 self.listener_q.put(push_obj)
