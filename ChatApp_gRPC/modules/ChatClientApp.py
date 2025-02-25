@@ -211,9 +211,10 @@ class ChatClientApp:
             if action == "login" and "session_id" in resp_dict:
                 # Retrieve the unread message count (default to 0 if not provided)
                 unread = resp_dict.get("unread_messages", 0)
+                session_id = resp_dict.get("session_id", "")
                 # Update the response label to show the unread messages count
                 self.response_label.config(text=f"Login successful. You have {unread} unread messages.")
-                self.client.start_listener(from_user, self.handle_incoming_message)
+                self.client.start_listener(from_user, session_id, self.handle_incoming_message)
 
         except ConnectionRefusedError:
             self.response_label.config(text="Could not connect to server. Is it running?")
