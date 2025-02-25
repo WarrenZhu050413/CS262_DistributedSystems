@@ -28,10 +28,10 @@ class ChatClient:
         self.session_id: Optional[str] = None  # Keep session state here if needed
 
         # Create and configure the SSL context
-        self.context: ssl.SSLContext = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-        self.context.load_verify_locations(cafile=cafile)
-        self.context.check_hostname = False
-        self.context.verify_mode = ssl.CERT_NONE
+        # self.context: ssl.SSLContext = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        # self.context.load_verify_locations(cafile=cafile)
+        # self.context.check_hostname = False
+        # self.context.verify_mode = ssl.CERT_NONE
 
         # Create a channel to the gRPC server.
         channel = grpc.insecure_channel(f"{self.host}:{self.port}")
@@ -133,34 +133,6 @@ class ChatClient:
 
         else:
             raise ValueError("Unsupported action")
-
-            
-    # def delete_account(self, username):
-    #     """
-    #     Send a request to delete a user account.
-
-    #     Args:
-    #         username (str): The username of the account to delete
-
-    #     Returns:
-    #         Dict[str, Any]: The server's response as a dictionary
-    #     """
-    #     wire_message = WireMessageBinary.make_wire_message(
-    #         action="delete_account",
-    #         from_user=username,
-    #         to_user="",  # not used for deletion
-    #         password="",  # not needed here
-    #         msg="",
-    #         session_id=self.session_id
-    #     )
-
-    #     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
-    #         raw_socket.connect((self.host, self.port))
-    #         with self.context.wrap_socket(raw_socket, server_side=False, server_hostname=self.host) as s:
-    #             s.sendall(wire_message)
-    #             resp_bytes: bytes = WireMessageBinary.read_wire_message(s)
-    #             resp_dict: Dict[str, Any] = WireMessageBinary.parse_wire_message(resp_bytes)
-    #             return resp_dict
 
     # ------------------------------
     # NEW: Persistent listener for real-time messages

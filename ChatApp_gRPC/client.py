@@ -1,8 +1,8 @@
 import tkinter as tk
 from typing import Dict, Any, Optional
-from .modules.ChatClientApp import ChatClientApp
-from .modules.ChatClient import ChatClient
-from .modules.config import HOST, PORT, CERT_FILE
+from ChatApp_gRPC.modules.ChatClientApp import ChatClientApp
+from ChatApp_gRPC.modules.ChatClient import ChatClient
+from ChatApp_gRPC.modules.config import HOST, PORT, CERT_FILE
 
 def main() -> None:
     root: tk.Tk = tk.Tk()
