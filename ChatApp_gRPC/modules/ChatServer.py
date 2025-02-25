@@ -498,7 +498,7 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
         Args:
             session_id: User's session ID
             from_user: Username requesting deletion
-            msg_ids_str: Comma-separated list of message IDs
+            msg_ids: List of int message IDs
             
         Returns:
             dict: Response with remaining messages
@@ -511,7 +511,7 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
         """
         session_id = request.session_id
         from_user = request.from_user
-        msg_ids_str = request.message_ids
+        msg_ids = request.message_ids
 
         # Validate session.
         if not session_id or session_id not in self.active_sessions:
@@ -525,9 +525,8 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
 
         # Parse the comma-separated message IDs.
         try:
-            ids = [int(x.strip()) for x in msg_ids_str.split(',') if x.strip()]
-            print(ids)
-            if not ids:
+            print(msg_ids)
+            if not msg_ids:
                 result = {"status": "error", "error": "No valid message IDs provided"}
                 self.logger.info("Returning from DeleteMessages: %s", result)
                 return chat_pb2.DeleteMessagesResponse(status=result["status"], error=result["error"])
@@ -538,9 +537,9 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
 
         conn = sqlite3.connect(self.db_file)
         c = conn.cursor()
-        placeholders = ','.join(['?'] * len(ids))
+        placeholders = ','.join(['?'] * len(msg_ids))
         # Only delete messages for this user.
-        c.execute(f"DELETE FROM messages WHERE id IN ({placeholders}) AND to_user=?", (*ids, from_user))
+        c.execute(f"DELETE FROM messages WHERE id IN ({placeholders}) AND to_user=?", (*msg_ids, from_user))
         conn.commit()
 
         # Retrieve the delivered messages for this user. TODO: may need to tweak this?
@@ -562,7 +561,7 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
             messages_list.append(message)
         conn.close()
 
-        result = {"status": "ok", "message": f"Deleted messages: {ids}", "messages": messages_list}
+        result = {"status": "ok", "message": f"Deleted messages: {msg_ids}", "messages": messages_list}
         self.logger.info("Returning from DeleteMessages: %s", result)
         return chat_pb2.DeleteMessagesResponse(status=result["status"], content=result["message"], messages=result["messages"])
     
