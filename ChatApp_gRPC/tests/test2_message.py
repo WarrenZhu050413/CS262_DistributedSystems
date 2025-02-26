@@ -11,13 +11,13 @@ from ChatApp_gRPC.modules.config import HOST, PORT, CERT_FILE
 ###############################################################################
 class TestChatApp(unittest.TestCase):
 
-    def test_offline_message_fetching(self):
+    def test_message_fetching(self):
         """
-        Test that messages delivered to an offline recipient are stored and can be fetched 
+        Test that messages delivered to a recipient are stored and can be fetched 
         when the recipient logs back on.
         Steps:
           1. Register and login a sender.
-          2. Register a recipient but do not start its persistent listener (simulate offline).
+          2. Register a recipient but do not start its persistent listener.
           3. Sender sends a message to the recipient.
           4. Recipient logs in later and fetches messages.
           5. Verify that the fetched messages contain the sent message.
@@ -28,7 +28,7 @@ class TestChatApp(unittest.TestCase):
         sender_username = "sender_" + "".join(random.choices(string.ascii_lowercase, k=6))
         recipient_username = "recipient_" + "".join(random.choices(string.ascii_lowercase, k=6))
         password = "testpass"
-        test_message = "Offline message test"
+        test_message = "Message test"
 
         # 1) Register both users.
         for user in [sender_username, recipient_username]:
@@ -42,7 +42,7 @@ class TestChatApp(unittest.TestCase):
             self.assertEqual(resp.get("status"), "ok",
                              f"Registration failed for {user}: {resp}")
 
-        # 2) Login sender. (Recipient is "offline" - no listener started.)
+        # 2) Login sender.
         resp_sender = client_sender.send_request(
             action="login",
             from_user=sender_username,
@@ -99,8 +99,8 @@ class TestChatApp(unittest.TestCase):
         self.assertEqual(resp_fetch.get("status"), "ok", f"Fetch messages failed: {resp_fetch}")
         messages = resp_fetch.get("messages", [])
         found = any(test_message in m.get("content", "") for m in messages)
-        self.assertTrue(found, "Fetched messages did not include the offline message.")
-        print(f"Offline message fetching successful for {recipient_username}")
+        self.assertTrue(found, "Fetched messages did not include the message.")
+        print(f"Message fetching successful for {recipient_username}")
 
     def test_message_to_nonexistent_user(self):
         """
