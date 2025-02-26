@@ -3,14 +3,40 @@ import ssl
 import threading  # REAL-TIME MOD: Needed for the listener thread
 from typing import Dict, Any, Optional
 import grpc
+import csv
+import datetime
+
 from ChatApp_gRPC.proto_generated import chat_pb2
 from ChatApp_gRPC.proto_generated import chat_pb2_grpc
+
+# ------------------------------
+# Helper function to log to CSV
+# ------------------------------
+def log_to_csv(req_or_resp: str, data_size: int) -> None:
+    """
+    Logs relevant request/response data to a CSV file.
+
+    Args:
+        action (str): The action (e.g. "login", "register", "send_message", etc.)
+        from_user (str): The username of the sender
+        to_user (str): The username of the recipient
+        req_or_resp (str): "request" or "response"
+        data_size (int): The size of the data in bytes
+    """
+    with open("grpc_size.csv", "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        # You can add or remove columns as needed:
+        writer.writerow([
+            req_or_resp,
+            data_size
+        ])
+
 
 class ChatClient:
     """
     A client for connecting to and communicating with the chat server.
     
-    Handles sending requests, managing sessions, and maintaining a persistent 
+    Handles sending requests, managing sessions, and maintaining a persistent
     connection for real-time message delivery.
     """
 
@@ -27,13 +53,13 @@ class ChatClient:
         self.port: int = port
         self.session_id: Optional[str] = None  # Keep session state here if needed
 
-        # Create and configure the SSL context
+        # If using TLS:
         # self.context: ssl.SSLContext = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         # self.context.load_verify_locations(cafile=cafile)
         # self.context.check_hostname = False
         # self.context.verify_mode = ssl.CERT_NONE
 
-        # Create a channel to the gRPC server.
+        # Create a channel to the gRPC server (insecure for simplicity).
         channel = grpc.insecure_channel(f"{self.host}:{self.port}")
         self.stub = chat_pb2_grpc.ChatServiceStub(channel)
 
@@ -58,12 +84,28 @@ class ChatClient:
 
         if action == "register":
             request = chat_pb2.RegisterRequest(username=from_user, password=password)
+            # Log request size
+            request_size = len(request.SerializeToString())
+            log_to_csv("request", request_size)
+
             response = self.stub.Register(request)
+            # Log response size
+            response_size = len(response.SerializeToString())
+            log_to_csv("response", response_size)
+
             return {"status": response.status, "content": response.content}
 
         elif action == "login":
             request = chat_pb2.LoginRequest(username=from_user, password=password)
+            # Log request size
+            request_size = len(request.SerializeToString())
+            log_to_csv("request", request_size)
+
             response = self.stub.Login(request)
+            # Log response size
+            response_size = len(response.SerializeToString())
+            log_to_csv("response", response_size)
+
             # Save session_id if provided
             if response.session_id:
                 self.session_id = response.session_id
@@ -81,18 +123,37 @@ class ChatClient:
                 to_user=to_user,
                 content=msg
             )
+            # Log request size
+            request_size = len(request.SerializeToString())
+            log_to_csv("request", request_size)
+
             response = self.stub.SendMessage(request)
+            # Log response size
+            response_size = len(response.SerializeToString())
+            log_to_csv("response", response_size)
+
             return {"status": response.status, "content": response.content, "error": response.error}
 
         elif action == "read_messages":
             request = chat_pb2.ReadMessagesRequest(
                 session_id=self.session_id,
                 from_user=from_user,
-                count=int(msg)  # TODO: assuming msg is used to indicate the count
+                count=int(msg)  # assuming msg is used to indicate the count
             )
+            # Log request size
+            request_size = len(request.SerializeToString())
+            log_to_csv("request", request_size)
+
             response = self.stub.ReadMessages(request)
-            # You might want to convert the list of ChatMessage objects into dicts
-            messages = [{"id": m.id, "from_user": m.from_user, "content": m.content} for m in response.messages]
+            # Log response size
+            response_size = len(response.SerializeToString())
+            log_to_csv("response", response_size)
+
+            # Convert ChatMessage objects into dicts
+            messages = [
+                {"id": m.id, "from_user": m.from_user, "content": m.content}
+                for m in response.messages
+            ]
             return {"status": response.status, "messages": messages, "error": response.error}
 
         elif action == "list_accounts":
@@ -100,22 +161,39 @@ class ChatClient:
                 session_id=self.session_id,
                 pattern=msg  # using msg as the search pattern
             )
+            # Log request size
+            request_size = len(request.SerializeToString())
+            log_to_csv("request", request_size)
+
             response = self.stub.ListAccounts(request)
-            # TODO: parse this list like read_messages?
+            # Log response size
+            response_size = len(response.SerializeToString())
+            log_to_csv("response", response_size)
+
             return {"status": response.status, "accounts": list(response.accounts), "error": response.error}
 
         elif action == "delete_messages":
-            # In this case, you may need to adjust how you pass multiple message IDs.
-            # Here, we assume 'msg' is a comma-separated string of message IDs.
+            # In this case, we assume 'msg' is a comma-separated string of message IDs.
             message_ids = [int(mid) for mid in msg.split(',')]
             request = chat_pb2.DeleteMessagesRequest(
                 session_id=self.session_id,
                 from_user=from_user,
                 message_ids=message_ids
             )
+            # Log request size
+            request_size = len(request.SerializeToString())
+            log_to_csv("request", request_size)
+
             response = self.stub.DeleteMessages(request)
+            # Log response size
+            response_size = len(response.SerializeToString())
+            log_to_csv("response", response_size)
+
             # Process messages similarly to read_messages.
-            messages_list = [{"id": m.id, "from_user": m.from_user, "content": m.content} for m in response.messages]
+            messages_list = [
+                {"id": m.id, "from_user": m.from_user, "content": m.content}
+                for m in response.messages
+            ]
             return {
                 "status": response.status,
                 "content": response.content,
@@ -128,7 +206,15 @@ class ChatClient:
                 session_id=self.session_id,
                 username=from_user
             )
+            # Log request size
+            request_size = len(request.SerializeToString())
+            log_to_csv("request", request_size)
+
             response = self.stub.DeleteAccount(request)
+            # Log response size
+            response_size = len(response.SerializeToString())
+            log_to_csv("response", response_size)
+
             return {"status": response.status, "content": response.content, "error": response.error}
 
         else:
@@ -150,7 +236,6 @@ class ChatClient:
             try:
                 for chat_msg in self.stub.Listen(request):
                     # 'chat_msg' is a ChatMessage from the server
-                    # Call the callback with the new message
                     callback(chat_msg)
             except grpc.RpcError as e:
                 # If the server disconnects or there's an error, handle it
@@ -158,11 +243,3 @@ class ChatClient:
         
         self.listener_thread = threading.Thread(target=run_listen, daemon=True)
         self.listener_thread.start()
-
-    # def stop_listener(self):
-    #     """
-    #     Stop the background listener thread and close its connection.
-    #     """
-    #     if self.listener_socket is not None:
-    #         self.listener_socket.close()
-    #         self.listener_socket = None
