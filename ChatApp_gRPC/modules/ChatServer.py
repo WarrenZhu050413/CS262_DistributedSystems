@@ -6,54 +6,43 @@ import bcrypt
 import ssl
 import queue
 import logging
-from ChatApp_gRPC.modules.config import HOST, PORT, CERT_FILE, KEY_FILE, DB_FILE, LOG_FILE
 from ChatApp_gRPC.proto_generated import chat_pb2
 from ChatApp_gRPC.proto_generated import chat_pb2_grpc
-from ChatApp_gRPC.proto_generated.chat_pb2_grpc import add_ChatServiceServicer_to_server
-
-# Changed message_list into a protobuf list of ChatMessage objects.
-# Changed name to ChatServiceServicer.
-# Make sure that everything is in the correct type. Things are converted to int if they are actually ints.
-
 from typing import Dict
 class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
     """
-    A secure chat server implementation that handles multiple concurrent client connections.
+    A secure gRPC chat server implementation that handles multiple concurrent client connections.
     
     This server provides:
-    - TLS encryption for all communications
-    - User registration and authentication
-    - Real-time message delivery when recipients are online
-    - Message storage and delayed delivery for offline recipients
+    - TLS encryption for all communications using gRPC's built-in security
+    - User registration and authentication with bcrypt password hashing
+    - Real-time message delivery through gRPC streaming when recipients are online
+    - Message storage in SQLite and delayed delivery for offline recipients
     - Account management features like listing users and deleting accounts
     - Message management including reading and deleting messages
     
     The server uses:
-    - Non-blocking sockets with selectors for concurrent I/O
+    - gRPC for secure client-server communication
     - SQLite for persistent storage of users and messages
     - bcrypt for secure password hashing
-    - Binary wire protocol for efficient message encoding
+    - Protocol Buffers for efficient message serialization
     
     Key Features:
-    - Secure communication using TLS
-    - User authentication and session management
-    - Real-time and offline message delivery
-    - Account and message management
-    - Concurrent client handling
-    - Persistent message storage
-    - Comprehensive logging
+    - Secure communication using TLS over gRPC
+    - User authentication and session management with secure tokens
+    - Real-time message streaming for online recipients
+    - Account and message management through gRPC service methods
+    - Concurrent client handling via gRPC's threading model
+    - Persistent message storage in SQLite
+    - Comprehensive logging of server operations
 
     How it works:
-    Uses accept_wrapper() to accept new connections.
-    Uses service_connection() to handle events on client connections.
-    Uses _handle_read() to process incoming data from a client connection.
-    Uses _handle_write() to send queued outgoing data to a client.
-
-    _handle_read() uses handle_request() to route and handle client 
-    requests to different helper functions depending on the user request.
-    
-    Then the server response is encoded using WireMessageBinary and added 
-    to the outgoing buffer to be sent to the client in _handle_write().
+    - Implements the gRPC service interface defined in chat.proto
+    - Each RPC method (Register, Login, SendMessage etc.) handles specific functionality
+    - Uses session tokens to authenticate requests
+    - Maintains active sessions and real-time message queues in memory
+    - Stores messages in SQLite until delivered
+    - Streams real-time messages to connected clients using gRPC streaming
     """
 
     def __init__(self, host: str, port: int, db_file: str, cert_file: str, key_file: str, log_file: str) -> None:
@@ -94,6 +83,19 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
 
         # Set up the database
         self.setup_database()
+
+        # Configure TLS credentials
+        try:
+            with open(cert_file, 'rb') as f:
+                certificate_chain = f.read()
+            with open(key_file, 'rb') as f:
+                private_key = f.read()
+            self.server_credentials = grpc.ssl_server_credentials(
+                ((private_key, certificate_chain),)
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to load TLS credentials: {e}")
+            raise
 
     def setup_logging(self):
         """
@@ -156,38 +158,54 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
         """)
         conn.commit()
         conn.close()
-
     def get_all_usernames(self):
         """
         Retrieve all registered usernames from database.
         
         Returns:
-            list: List of all usernames in the database
+            list: List of all usernames in the database sorted alphabetically
             
-        Used primarily for debugging and account listing.
+        Used primarily for:
+        - Debugging and account listing
+        - Pattern matching searches
+        - Validating usernames during registration
+        - Checking for duplicate accounts
+        
+        The returned usernames can be used to:
+        - Display all registered users
+        - Search for specific users
+        - Verify username availability
+        - Generate user statistics
         """
         conn = sqlite3.connect(self.db_file)
         c = conn.cursor()
-        c.execute("SELECT username FROM users")
+        c.execute("SELECT username FROM users ORDER BY username ASC")
         rows = c.fetchall()
         conn.close()
         return [row[0] for row in rows]
-
     def Register(self, request, context):
         """
         Register a new user account.
         
         Args:
-            request: RegisterRequest object
-            context: gRPC context
+            request (chat_pb2.RegisterRequest): The request containing:
+                username (str): The username to register
+                password (str): The password to hash and store
+            context (grpc.ServicerContext): gRPC context for handling metadata, timeouts, etc.
             
         Returns:
-            RegisterResponse object
+            chat_pb2.RegisterResponse: Response containing:
+                status (str): "ok" on success, "error" on failure
+                error (str): Error message if status is "error"
+                content (str): Success message if status is "ok"
             
         The password is hashed using bcrypt before storage.
         Validates:
-        - Password length
-        - Username uniqueness
+        - Password length must be less than 256 characters
+        - Username must not already exist in database
+        
+        Raises:
+            sqlite3.Error: If there is a database error during registration
         """
         username = request.username
         password = request.password
@@ -225,23 +243,34 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
         result = {"status": "ok", "message": "Registration successful"}
         self.logger.info("Returning from Register: %s", result)
         return chat_pb2.RegisterResponse(status=result["status"], content=result["message"])
-
     def Login(self, request, context):
         """
         Authenticate a user and create a session.
         
         Args:
-            request: LoginRequest object
-            context: gRPC context
+            request (chat_pb2.LoginRequest): The request containing:
+                username (str): The username to authenticate
+                password (str): The password to verify
+            context (grpc.ServicerContext): gRPC context for handling metadata, timeouts, etc.
             
         Returns:
-            LoginResponse object
+            chat_pb2.LoginResponse: Response containing:
+                status (str): "ok" on success, "error" on failure
+                error (str): Error message if status is "error"
+                session_id (str): 32-character hex session token on success
+                unread_messages (int): Count of undelivered messages for user
             
         On successful login:
-        1. Verifies username/password
-        2. Creates new session ID
-        3. Counts unread messages
-        4. Returns session ID and unread count
+        1. Verifies username exists in database
+        2. Verifies password matches bcrypt hash in database
+        3. Creates new 32-character hex session ID
+        4. Stores session ID -> username mapping
+        5. Counts unread messages for user
+        6. Returns session ID and unread count
+        
+        On failure:
+        1. Returns error status and message
+        2. Logs failed attempt
         """
         username = request.username
         password = request.password
@@ -277,27 +306,30 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
         result = {"status": "ok", "session_id": session_id, "unread_messages": unread_count}
         self.logger.info("Returning from Login: %s", result)
         return chat_pb2.LoginResponse(status=result["status"], session_id=result['session_id'], unread_messages=int(result['unread_messages']))
-
-
     def SendMessage(self, request, context):
         """
         Process a message send request.
         
         Args:
-            session_id: Sender's session ID
-            from_user: Sender's username
-            to_user: Recipient's username
-            msg: Message content
+            request (chat_pb2.SendMessageRequest): The request containing:
+                session_id (str): Sender's session ID
+                from_user (str): Sender's username
+                to_user (str): Recipient's username 
+                content (str): Message content
+            context (grpc.ServicerContext): gRPC context
             
         Returns:
-            dict: Response indicating delivery status
+            chat_pb2.SendMessageResponse: Response indicating delivery status
             
         This method:
-        1. Validates the session
-        2. Verifies recipient exists
-        3. Stores message in database
-        4. Attempts real-time delivery if recipient is listening
-        5. Marks message as delivered if real-time delivery succeeds
+        1. Validates the session ID and sender match
+        2. Verifies recipient exists in database
+        3. Stores message in database with delivered=0
+        4. Attempts real-time delivery via recipient's listener queue if online
+        5. Marks message as delivered=1 if real-time delivery succeeds
+        
+        Raises:
+            No exceptions - errors returned in response
         """
         session_id = request.session_id
         from_user = request.from_user
@@ -443,22 +475,27 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
         self.logger.info("Returning from ReadMessages: %s", result)
         return chat_pb2.ReadMessagesResponse(status=result["status"], messages=result["messages"])
 
-
     def ListAccounts(self, request, context):
         """
         List user accounts matching a pattern.
         
         Args:
-            session_id: Requester's session ID
-            pattern: Search pattern (supports * wildcard)
+            request (chat_pb2.ListAccountsRequest): The request object containing:
+                session_id (str): Requester's session ID for authentication
+                pattern (str): Search pattern for matching usernames
+            context (grpc.ServicerContext): gRPC service context
             
         Returns:
-            dict: Response with list of matching usernames
+            chat_pb2.ListAccountsResponse: Response containing:
+                status (str): "ok" if successful, "error" if failed
+                accounts (List[str]): List of matching usernames if successful
+                error (str): Error message if failed
             
-        The pattern:
-        - Empty pattern lists all users
-        - * wildcard converted to SQL LIKE %
-        - Returns usernames matching pattern
+        The pattern matching:
+        - Empty pattern lists all users by converting to SQL LIKE %
+        - * wildcard character is converted to SQL LIKE % for pattern matching
+        - Returns all usernames that match the converted pattern
+        - Case sensitive matching is used
         """
         session_id = request.session_id
         pattern = request.pattern
@@ -493,24 +530,29 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
         self.logger.info("Returning from ListAccounts: %s", result)
         return chat_pb2.ListAccountsResponse(status=result["status"], accounts=result["accounts"])
 
-    
     def DeleteMessages(self, request, context):
         """
         Delete specified messages for a user.
         
         Args:
-            session_id: User's session ID
-            from_user: Username requesting deletion
-            msg_ids: List of int message IDs
+            request (chat_pb2.DeleteMessagesRequest): The request object containing:
+                session_id (str): User's session ID for authentication
+                from_user (str): Username requesting message deletion
+                message_ids (List[int]): List of message IDs to delete
+            context (grpc.ServicerContext): gRPC service context
             
         Returns:
-            dict: Response with remaining messages
+            chat_pb2.DeleteMessagesResponse: Response containing:
+                status (str): "ok" if successful, "error" if failed
+                content (str): Success message if messages deleted
+                messages (List[ChatMessage]): List of remaining messages after deletion
+                error (str): Error message if failed
             
         This method:
-        1. Validates session
-        2. Parses message IDs
-        3. Deletes specified messages
-        4. Returns remaining messages
+        1. Validates the session ID matches the requesting user
+        2. Deletes the specified messages from the database
+        3. Returns remaining messages for the user
+        4. Returns error if validation fails or deletion fails
         """
         session_id = request.session_id
         from_user = request.from_user
@@ -568,23 +610,28 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
         self.logger.info("Returning from DeleteMessages: %s", result)
         return chat_pb2.DeleteMessagesResponse(status=result["status"], content=result["message"], messages=result["messages"])
     
-    def DeleteAccount(self, request, context):
+    def DeleteAccount(self, request: chat_pb2.DeleteAccountRequest, context) -> chat_pb2.DeleteAccountResponse:
         """
         Delete a user account and all associated data.
         
         Args:
-            username: Username to delete
-            session_id: User's session ID
+            request: DeleteAccountRequest containing:
+                - username (str): Username of account to delete
+                - session_id (str): Session ID for authentication
+            context: gRPC context object
             
         Returns:
-            dict: Response indicating success/failure
+            DeleteAccountResponse containing:
+                - status (str): "ok" or "error"
+                - content (str): Success message if status is "ok"
+                - error (str): Error message if status is "error"
             
         This method:
-        1. Validates session
-        2. Deletes user from database
-        3. Deletes all messages to/from user
-        4. Removes session and listener
-        5. Returns success message
+        1. Validates session matches username
+        2. Deletes user record from users table
+        3. Deletes all messages to/from user from messages table
+        4. Removes active session and listener for user
+        5. Returns success/error response
         """
         username = request.username
         session_id = request.session_id
@@ -619,38 +666,54 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
         result = {"status": "ok", "content": "Account has been deleted, close app to finish."}
         self.logger.info("Returning from DeleteAccount: %s", result)
         return chat_pb2.DeleteAccountResponse(status=result["status"], content=result["content"])
-
+    
     def Listen(self, request, context):
-        # Validate session, ensure request.username matches a valid session, etc.
+        """
+        Handles real-time message streaming for a client.
+        
+        Args:
+            request: ListenRequest containing:
+                - username (str): Username to listen for messages
+                - session_id (str): Session ID for authentication
+            context: gRPC context object for managing stream lifecycle
+            
+        Yields:
+            PushObject messages containing:
+                - status (str): "ok" or "error"
+                - from_user (str): Sender username
+                - content (str): Message content
+                - error (str): Error message if status is "error"
+        """
         username = request.username
         session_id = request.session_id
+
+        # Validate session
         if session_id not in self.active_sessions or \
            self.active_sessions[session_id] != username:
             context.set_code(grpc.StatusCode.UNAUTHENTICATED)
-            context.set_details("Invalid session.")
-            return  # Ends the stream immediately.
+            context.set_details("Invalid session - please login again")
+            return
 
-        # Create a queue so we can push messages from SendMessage
-        # or anywhere else. The Listen method will yield from that queue.
-        q = queue.Queue()
-        self.listeners[username] = q
+        # Create message queue for this user
+        message_queue = queue.Queue()
+        self.listeners[username] = message_queue
 
         try:
             while True:
-                # If the client disappears or cancels, context.is_active() becomes False
+                # Check if client is still connected
                 if not context.is_active():
                     break
 
-                # Block until we get a new ChatMessage or a sentinel to close
+                # Wait for new messages with timeout
                 try:
-                    msg = q.get(timeout=1.0)  # or some short timeout
+                    message = message_queue.get(timeout=1.0)
                 except queue.Empty:
                     continue
 
-                # 'msg' should be a chat_pb2.ChatMessage
-                yield msg
+                # message will be a PushObject with status, from_user, content
+                yield message
 
         finally:
             # Clean up if the client stops listening
-            if username in self.listeners and self.listeners[username] == q:
+            if username in self.listeners and self.listeners[username] == message_queue:
                 del self.listeners[username]

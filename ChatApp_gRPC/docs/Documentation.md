@@ -3,42 +3,49 @@
 ## Table of Contents
 
 - [ChatApp documentation](#chatapp-documentation)
-	- [Table of Contents](#table-of-contents)
+  - [Table of Contents](#table-of-contents)
 - [1. Introduction](#1-introduction)
 - [2. Features](#2-features)
 - [3. Architecture](#3-architecture)
 - [4. Package Structure](#4-package-structure)
 - [5. Core Components](#5-core-components)
-	- [ChatClient](#chatclient)
-	- [ChatClientApp](#chatclientapp)
-	- [ChatServer](#chatserver)
+  - [ChatClient](#chatclient)
+  - [ChatClientApp](#chatclientapp)
+  - [ChatServer](#chatserver)
 - [6. Supported gRPC Methods](#6-supported-grpc-methods)
-		- [Register](#register)
-		- [Login](#login)
-		- [SendMessage](#sendmessage)
-		- [ReadMessages](#readmessages)
-		- [ListAccounts](#listaccounts)
-		- [DeleteMessages](#deletemessages)
-		- [DeleteAccount](#deleteaccount)
-		- [Listen (streaming)](#listen-streaming)
+    - [Register](#register)
+    - [Login](#login)
+    - [SendMessage](#sendmessage)
+    - [ReadMessages](#readmessages)
+    - [ListAccounts](#listaccounts)
+    - [DeleteMessages](#deletemessages)
+    - [DeleteAccount](#deleteaccount)
+    - [Listen (streaming)](#listen-streaming)
 - [7. Security \& TLS](#7-security--tls)
 - [8. Data Persistence](#8-data-persistence)
 - [9. Real-Time Message Delivery](#9-real-time-message-delivery)
 - [10. Design Principles](#10-design-principles)
 - [11. Quick Start Guide](#11-quick-start-guide)
-	- [Prerequisites](#prerequisites)
-	- [Installation](#installation)
-	- [Running the Server](#running-the-server)
-	- [Running the Client](#running-the-client)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Running the Server](#running-the-server)
+  - [Running the Client](#running-the-client)
 - [12. Testing](#12-testing)
+  - [Test Suite Overview](#test-suite-overview)
+    - [Test Files](#test-files)
+      - [test1\_login-register.py](#test1_login-registerpy)
+      - [test2\_message.py](#test2_messagepy)
+      - [test3\_delete.py](#test3_deletepy)
+    - [Running Tests](#running-tests)
+    - [Test Coverage](#test-coverage)
 - [13. Logging](#13-logging)
 - [14. Extensibility](#14-extensibility)
 - [15. Code Reference](#15-code-reference)
-	- [proto/chat.proto](#protochatproto)
-	- [modules/chat\_pb2.py and modules/chat\_pb2\_grpc.py](#moduleschat_pb2py-and-moduleschat_pb2_grpcpy)
-	- [modules/chatclient.py](#moduleschatclientpy)
-	- [modules/chatclientapp.py](#moduleschatclientapppy)
-	- [modules/chatserver.py](#moduleschatserverpy)
+  - [proto/chat.proto](#protochatproto)
+  - [modules/chat\_pb2.py and modules/chat\_pb2\_grpc.py](#moduleschat_pb2py-and-moduleschat_pb2_grpcpy)
+  - [modules/chatclient.py](#moduleschatclientpy)
+  - [modules/chatclientapp.py](#moduleschatclientapppy)
+  - [modules/chatserver.py](#moduleschatserverpy)
 
 ---
 
@@ -111,14 +118,19 @@ ChatApp_gRPC/
 │   ├── __init__.py
 │   ├── chatclient.py     <-- Chat client logic (uses stubs)
 │   ├── chatclientapp.py  <-- Tkinter GUI
+│   ├── config.py         <-- Config files
 │   └── chatserver.py     <-- gRPC server implementation
 ├── docs/
 │   └── Documentation.md  <-- This documentation file
 ├── tests/
-│   └── test_chat.py     <-- Unit tests
-└── certs/
-    ├── server.crt       <-- Server certificate
-    └── server.key       <-- Server private key
+│   ├── test1_login-register.py  <-- Authentication tests
+│   ├── test2_message.py        <-- Messaging tests
+│   └── test3_delete.py         <-- Account management tests
+├── security/
+│   ├── certs/
+│   │   ├── server.crt          <-- Server certificate
+│   │   ├── server.key          <-- Server private key
+│   │   └── server_cert.conf    <-- Certificate configuration
 ```
 
 - **modules/**: Core application modules (server, client, generated gRPC code, configuration).
@@ -337,16 +349,59 @@ The `chat.proto` file defines the following RPCs on the `ChatService`:
 
 # 12. Testing
 
-- **Test Files**: Located in the `tests/` directory (e.g., `test1.py`, `test2.py`, etc.).
-- **Running Tests**:
-  ```
-  cd CS262_DistributedSystems
-  python -m ChatApp.tests.test1
-  ```
-  (Adjust the test file name as needed.)
+## Test Suite Overview
+Our test suite comprehensively covers all gRPC functionalities implemented in the chat application, ensuring robust client-server communication.
 
----
+### Test Files
+Located in the `tests/` directory:
 
+#### test1_login-register.py
+- **Authentication Tests**
+  - User registration with unique usernames
+  - Login with valid credentials
+  - Login with non-existent users
+  - Login with incorrect passwords
+  - Duplicate username registration prevention
+  - End-to-end message sending after authentication
+
+#### test2_message.py
+- **Messaging System Tests**
+  - Real-time message delivery
+  - Offline message storage and retrieval
+  - Message delivery to non-existent users
+  - Message formatting and content preservation
+  - Multiple recipient handling
+  - Message queuing and ordering
+
+#### test3_delete.py
+- **Account and Data Management Tests**
+  - User account listing and search functionality
+  - Message deletion (single and batch)
+  - Account deletion and cleanup
+  - Post-deletion verification
+  - Account reuse prevention
+
+### Running Tests
+```bash
+cd CS262_DistributedSystems
+python -m ChatApp_gRPC.tests.test1_login-register
+python -m ChatApp_gRPC.tests.test2_message
+python -m ChatApp_gRPC.tests.test3_delete
+```
+
+### Test Coverage
+Our tests verify all implemented gRPC service calls:
+- Register
+- Login
+- Send Message
+- Read Messages
+- List Accounts
+- Delete Messages
+- Delete Account
+- Account Search
+- Session Management
+
+Each functionality is tested for both success and failure cases, ensuring robust error handling and proper response formatting through the gRPC protocol.
 # 13. Logging
 
 - **Configuration**: Logging is typically configured in `ChatServer.setup_logging()` (or similar initialization).
@@ -390,8 +445,6 @@ service ChatService {
   rpc DeleteAccount (DeleteAccountRequest) returns (DeleteAccountResponse);
   rpc Listen (ListenRequest) returns (stream ListenResponse);
 }
-
-// Message definitions go here ...
 ```
 
 ## modules/chat_pb2.py and modules/chat_pb2_grpc.py

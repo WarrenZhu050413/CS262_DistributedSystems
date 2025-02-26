@@ -1,9 +1,7 @@
-import ssl
-import threading  # REAL-TIME MOD: Needed for the listener thread
+import threading
 from typing import Dict, Any, Optional
 import grpc
 import csv
-import datetime
 
 from ChatApp_gRPC.proto_generated import chat_pb2
 from ChatApp_gRPC.proto_generated import chat_pb2_grpc
@@ -30,17 +28,31 @@ class ChatClient:
         self.port: int = port
         self.session_id: Optional[str] = None  # Keep session state here if needed
 
-        # If using TLS:
-        # self.context: ssl.SSLContext = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-        # self.context.load_verify_locations(cafile=cafile)
-        # self.context.check_hostname = False
-        # self.context.verify_mode = ssl.CERT_NONE
 
-        # Create a channel to the gRPC server (insecure for simplicity).
-        channel = grpc.insecure_channel(f"{self.host}:{self.port}")
-        self.stub = chat_pb2_grpc.ChatServiceStub(channel)
-
-        # NEW: Attributes to manage the persistent listener.
+        if cafile:
+            # Load the certificate file
+            with open(cafile, 'rb') as f:
+                root_cert = f.read()
+            
+            credentials = grpc.ssl_channel_credentials(
+                root_certificates=root_cert,
+                private_key=None,
+                certificate_chain=None
+            )
+            
+            # Create channel with the certificate and override the target name
+            self.channel = grpc.secure_channel(
+                f'{host}:{port}', 
+                credentials,
+                options=(
+                    ('grpc.ssl_target_name_override', 'localhost'),
+                    ('grpc.default_authority', 'localhost')
+                )
+            )
+        else:
+            self.channel = grpc.insecure_channel(f'{host}:{port}')
+            
+        self.stub = chat_pb2_grpc.ChatServiceStub(self.channel)
         self.listener_thread = None
         self.listener_socket = None
 
@@ -56,6 +68,7 @@ class ChatClient:
             msg (str): The message content
 
         Returns:
+            Dict[str, Any]: The server's response as a dictionary containing:
             Dict[str, Any]: The server's response as a dictionary
         """
 
@@ -197,9 +210,6 @@ class ChatClient:
         else:
             raise ValueError("Unsupported action")
 
-    # ------------------------------
-    # NEW: Persistent listener for real-time messages
-    # ------------------------------
     def start_listener(self, username, session_id, callback):
         """
         Spawns a background thread which calls the server-streaming RPC Listen()
@@ -221,9 +231,6 @@ class ChatClient:
         self.listener_thread = threading.Thread(target=run_listen, daemon=True)
         self.listener_thread.start()
 
-# ------------------------------
-# Helper function to log to CSV
-# ------------------------------
 def log_to_csv(req_or_resp: str, data_size: int) -> None:
     """
     Logs relevant request/response data to a CSV file.
@@ -237,7 +244,6 @@ def log_to_csv(req_or_resp: str, data_size: int) -> None:
     """
     with open("grpc_size.csv", "a", newline="") as csvfile:
         writer = csv.writer(csvfile)
-        # You can add or remove columns as needed:
         writer.writerow([
             req_or_resp,
             data_size
