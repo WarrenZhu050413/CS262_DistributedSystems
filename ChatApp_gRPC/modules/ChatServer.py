@@ -342,11 +342,14 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
         if to_user in self.listeners:
             # listener_data = self.listeners[to_user]
             try:
+                # push_obj = chat_pb2.PushObject(status="ok", from_user=from_user, content=msg)
+                # self.listener_q.put(push_obj)
                 push_obj = chat_pb2.PushObject(status="ok", from_user=from_user, content=msg)
-                self.listener_q.put(push_obj)
+                self.listeners[to_user].put(push_obj)  # Use the recipient's actual queue
                 c.execute("UPDATE messages SET delivered=1 WHERE id=?", (message_id,))
                 conn.commit()
                 conn.close()
+                
                 result = {"status": "ok", "message": f"Message delivered to {to_user} in real-time"}
                 self.logger.info("Returning from SendMessage: %s", result)
                 return chat_pb2.SendMessageResponse(status=result["status"], content=result["message"])

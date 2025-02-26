@@ -1,4 +1,3 @@
-import socket
 import ssl
 import threading  # REAL-TIME MOD: Needed for the listener thread
 from typing import Dict, Any, Optional
@@ -8,28 +7,6 @@ import datetime
 
 from ChatApp_gRPC.proto_generated import chat_pb2
 from ChatApp_gRPC.proto_generated import chat_pb2_grpc
-
-# ------------------------------
-# Helper function to log to CSV
-# ------------------------------
-def log_to_csv(req_or_resp: str, data_size: int) -> None:
-    """
-    Logs relevant request/response data to a CSV file.
-
-    Args:
-        action (str): The action (e.g. "login", "register", "send_message", etc.)
-        from_user (str): The username of the sender
-        to_user (str): The username of the recipient
-        req_or_resp (str): "request" or "response"
-        data_size (int): The size of the data in bytes
-    """
-    with open("grpc_size.csv", "a", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        # You can add or remove columns as needed:
-        writer.writerow([
-            req_or_resp,
-            data_size
-        ])
 
 
 class ChatClient:
@@ -86,12 +63,12 @@ class ChatClient:
             request = chat_pb2.RegisterRequest(username=from_user, password=password)
             # Log request size
             request_size = len(request.SerializeToString())
-            log_to_csv("request", request_size)
+            # log_to_csv("request", request_size)
 
             response = self.stub.Register(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            log_to_csv("response", response_size)
+            # log_to_csv("response", response_size)
 
             return {"status": response.status, "content": response.content}
 
@@ -99,12 +76,12 @@ class ChatClient:
             request = chat_pb2.LoginRequest(username=from_user, password=password)
             # Log request size
             request_size = len(request.SerializeToString())
-            log_to_csv("request", request_size)
+            # log_to_csv("request", request_size)
 
             response = self.stub.Login(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            log_to_csv("response", response_size)
+            # log_to_csv("response", response_size)
 
             # Save session_id if provided
             if response.session_id:
@@ -125,12 +102,12 @@ class ChatClient:
             )
             # Log request size
             request_size = len(request.SerializeToString())
-            log_to_csv("request", request_size)
+            # log_to_csv("request", request_size)
 
             response = self.stub.SendMessage(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            log_to_csv("response", response_size)
+            # log_to_csv("response", response_size)
 
             return {"status": response.status, "content": response.content, "error": response.error}
 
@@ -142,12 +119,12 @@ class ChatClient:
             )
             # Log request size
             request_size = len(request.SerializeToString())
-            log_to_csv("request", request_size)
+            # log_to_csv("request", request_size)
 
             response = self.stub.ReadMessages(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            log_to_csv("response", response_size)
+            # log_to_csv("response", response_size)
 
             # Convert ChatMessage objects into dicts
             messages = [
@@ -163,12 +140,12 @@ class ChatClient:
             )
             # Log request size
             request_size = len(request.SerializeToString())
-            log_to_csv("request", request_size)
+            # log_to_csv("request", request_size)
 
             response = self.stub.ListAccounts(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            log_to_csv("response", response_size)
+            # log_to_csv("response", response_size)
 
             return {"status": response.status, "accounts": list(response.accounts), "error": response.error}
 
@@ -182,12 +159,12 @@ class ChatClient:
             )
             # Log request size
             request_size = len(request.SerializeToString())
-            log_to_csv("request", request_size)
+            # log_to_csv("request", request_size)
 
             response = self.stub.DeleteMessages(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            log_to_csv("response", response_size)
+            # log_to_csv("response", response_size)
 
             # Process messages similarly to read_messages.
             messages_list = [
@@ -208,12 +185,12 @@ class ChatClient:
             )
             # Log request size
             request_size = len(request.SerializeToString())
-            log_to_csv("request", request_size)
+            # log_to_csv("request", request_size)
 
             response = self.stub.DeleteAccount(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            log_to_csv("response", response_size)
+            # log_to_csv("response", response_size)
 
             return {"status": response.status, "content": response.content, "error": response.error}
 
@@ -243,3 +220,25 @@ class ChatClient:
         
         self.listener_thread = threading.Thread(target=run_listen, daemon=True)
         self.listener_thread.start()
+
+# ------------------------------
+# Helper function to log to CSV
+# ------------------------------
+def log_to_csv(req_or_resp: str, data_size: int) -> None:
+    """
+    Logs relevant request/response data to a CSV file.
+
+    Args:
+        action (str): The action (e.g. "login", "register", "send_message", etc.)
+        from_user (str): The username of the sender
+        to_user (str): The username of the recipient
+        req_or_resp (str): "request" or "response"
+        data_size (int): The size of the data in bytes
+    """
+    with open("grpc_size.csv", "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        # You can add or remove columns as needed:
+        writer.writerow([
+            req_or_resp,
+            data_size
+        ])

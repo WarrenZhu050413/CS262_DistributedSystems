@@ -26,7 +26,7 @@ service ChatService {
   rpc DeleteAccount (DeleteAccountRequest) returns (DeleteAccountResponse);
 
   // --- Real-time message streaming ---
-  rpc Listen (ListenRequest) returns (stream ListenResponse);
+  rpc Listen (ListenRequest) returns (stream PushObject);
 }
 
 // ---------- Messages ----------

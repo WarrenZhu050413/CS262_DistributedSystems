@@ -6,6 +6,7 @@ import string
 from ChatApp_gRPC.modules.ChatClient import ChatClient
 from ChatApp_gRPC.modules.config import HOST, PORT, CERT_FILE
 
+
 ###############################################################################
 # Test Class: Chat Application Tests
 ###############################################################################
@@ -64,7 +65,13 @@ class TestChatApp(unittest.TestCase):
         self.assertIn("Message stored for delivery", resp.get("content", ""),
                       "Unexpected message response")
         self.assertIsNotNone(client.session_id, "Client did not store session_id")
-        print(f"Successfully sent message from {test_username} to {test_recipient}")
+
+        # More descriptive success statement
+        print(
+            f"[TEST PASSED: test_register_login_send_message] "
+            f"User '{test_username}' was registered, logged in, and successfully sent "
+            f"the message '{test_message}' to '{test_recipient}'."
+        )
 
     def test_login_nonexistent_user(self):
         """
@@ -84,7 +91,13 @@ class TestChatApp(unittest.TestCase):
         )
         self.assertEqual(resp.get("status"), "error",
                          "Login should fail with nonexistent username")
-        print(f"Successfully prevented login from nonexistent user: {nonexistent_username}")
+
+        # More descriptive success statement
+        print(
+            f"[TEST PASSED: test_login_nonexistent_user] "
+            f"Server correctly returned an error when user '{nonexistent_username}' (not registered) "
+            f"attempted to log in."
+        )
 
     def test_register_same_username(self):
         """
@@ -116,7 +129,12 @@ class TestChatApp(unittest.TestCase):
         )
         self.assertEqual(resp.get("status"), "error",
                          "Registration should fail when using the same username twice")
-        print("Successfully prevented duplicate registration of the same username.")
+
+        # More descriptive success statement
+        print(
+            f"[TEST PASSED: test_register_same_username] "
+            f"Duplicate registration for user '{random_username}' was properly rejected."
+        )
 
     def test_login_incorrect_password(self):
         """
@@ -148,7 +166,13 @@ class TestChatApp(unittest.TestCase):
         )
         self.assertEqual(resp.get("status"), "error",
                          "Login should fail with an incorrect password")
-        print(f"Successfully prevented login with an incorrect password.")
+
+        # More descriptive success statement
+        print(
+            f"[TEST PASSED: test_login_incorrect_password] "
+            f"User '{test_username}' correctly failed to log in with the wrong password '{wrong_password}'."
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

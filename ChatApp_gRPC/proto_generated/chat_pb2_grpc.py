@@ -73,7 +73,7 @@ class ChatServiceStub(object):
         self.Listen = channel.unary_stream(
                 '/chat.ChatService/Listen',
                 request_serializer=chat__pb2.ListenRequest.SerializeToString,
-                response_deserializer=chat__pb2.ListenResponse.FromString,
+                response_deserializer=chat__pb2.PushObject.FromString,
                 _registered_method=True)
 
 
@@ -175,7 +175,7 @@ def add_ChatServiceServicer_to_server(servicer, server):
             'Listen': grpc.unary_stream_rpc_method_handler(
                     servicer.Listen,
                     request_deserializer=chat__pb2.ListenRequest.FromString,
-                    response_serializer=chat__pb2.ListenResponse.SerializeToString,
+                    response_serializer=chat__pb2.PushObject.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -394,7 +394,7 @@ class ChatService(object):
             target,
             '/chat.ChatService/Listen',
             chat__pb2.ListenRequest.SerializeToString,
-            chat__pb2.ListenResponse.FromString,
+            chat__pb2.PushObject.FromString,
             options,
             channel_credentials,
             insecure,
