@@ -244,12 +244,6 @@ class TestChatApp(unittest.TestCase):
         self.assertNotEqual(resp_login_again.get("status"), "ok",
                             f"Login succeeded for a deleted account: {resp_login_again}")
 
-        # 4) (Optional) Check that the user is not in the list of accounts or re-register
-        #    Below is an example check using list_accounts if your server includes
-        #    deleted accounts or not. If your server logic is different, adapt as needed.
-
-        # We have to login as some OTHER user to do list_accounts.
-        # For simplicity, we'll just register a new throwaway user.
         another_user = self._random_username("throwaway_")
         resp_reg_other = client.send_request(
             action="register",

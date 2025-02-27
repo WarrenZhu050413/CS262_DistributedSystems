@@ -76,12 +76,10 @@ class ChatClient:
             request = chat_pb2.RegisterRequest(username=from_user, password=password)
             # Log request size
             request_size = len(request.SerializeToString())
-            # log_to_csv("request", request_size)
 
             response = self.stub.Register(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            # log_to_csv("response", response_size)
 
             return {"status": response.status, "content": response.content}
 
@@ -89,12 +87,10 @@ class ChatClient:
             request = chat_pb2.LoginRequest(username=from_user, password=password)
             # Log request size
             request_size = len(request.SerializeToString())
-            # log_to_csv("request", request_size)
 
             response = self.stub.Login(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            # log_to_csv("response", response_size)
 
             # Save session_id if provided
             if response.session_id:
@@ -115,12 +111,9 @@ class ChatClient:
             )
             # Log request size
             request_size = len(request.SerializeToString())
-            # log_to_csv("request", request_size)
-
             response = self.stub.SendMessage(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            # log_to_csv("response", response_size)
 
             return {"status": response.status, "content": response.content, "error": response.error}
 
@@ -132,12 +125,10 @@ class ChatClient:
             )
             # Log request size
             request_size = len(request.SerializeToString())
-            # log_to_csv("request", request_size)
 
             response = self.stub.ReadMessages(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            # log_to_csv("response", response_size)
 
             # Convert ChatMessage objects into dicts
             messages = [
@@ -153,12 +144,9 @@ class ChatClient:
             )
             # Log request size
             request_size = len(request.SerializeToString())
-            # log_to_csv("request", request_size)
-
             response = self.stub.ListAccounts(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            # log_to_csv("response", response_size)
 
             return {"status": response.status, "accounts": list(response.accounts), "error": response.error}
 
@@ -172,12 +160,9 @@ class ChatClient:
             )
             # Log request size
             request_size = len(request.SerializeToString())
-            # log_to_csv("request", request_size)
-
             response = self.stub.DeleteMessages(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            # log_to_csv("response", response_size)
 
             # Process messages similarly to read_messages.
             messages_list = [
@@ -198,12 +183,9 @@ class ChatClient:
             )
             # Log request size
             request_size = len(request.SerializeToString())
-            # log_to_csv("request", request_size)
-
             response = self.stub.DeleteAccount(request)
             # Log response size
             response_size = len(response.SerializeToString())
-            # log_to_csv("response", response_size)
 
             return {"status": response.status, "content": response.content, "error": response.error}
 
