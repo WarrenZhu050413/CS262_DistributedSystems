@@ -15,8 +15,9 @@ def main():
                         help='Number of virtual machines (default: 3)')
     parser.add_argument('--base-port', type=int, default=10000, 
                         help='Base port number (default: 10000)')
+    parser.add_argument('--log_dir', type=str, default=1, 
+                        help='Directory to save log files (default: logs)')
     args = parser.parse_args()
-    
     # Create virtual machines
     vms = []
     for i in range(args.vm_count):
@@ -24,9 +25,10 @@ def main():
         vm = VirtualMachine(
             machine_id=i,
             port=port,
-            log_file=f"logs/vm_{i}.log"
+            log_file=f"logs/{args.log_dir}/vm_{i}.log"
         )
         vms.append(vm)
+        print(f"Created VM {i} on port {port}")
     
     # Connect each VM to all other VMs
     for i, vm in enumerate(vms):

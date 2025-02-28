@@ -1,0 +1,246 @@
+2025-02-27 18:27:12.f - M1 [LC:0] Initialized with clock rate 4 ticks/second
+2025-02-27 18:27:12.f - M1 [LC:0] Connected to VM 0 on port 10000
+2025-02-27 18:27:12.f - M1 [LC:0] Connected to VM 2 on port 10002
+2025-02-27 18:27:12.f - M1 [LC:1] Internal event
+2025-02-27 18:27:12.f - M1 [LC:1] Started VM 1 with clock rate 4
+2025-02-27 18:27:12.f - M1 [LC:2] Internal event
+2025-02-27 18:27:13.f - M1 [LC:3] Sent messages to all VMs
+2025-02-27 18:27:13.f - M1 [LC:4] Sent message to VM 0
+2025-02-27 18:27:13.f - M1 [LC:6] Received message. Queue length: 0
+2025-02-27 18:27:13.f - M1 [LC:7] Internal event
+2025-02-27 18:27:14.f - M1 [LC:8] Received message. Queue length: 0
+2025-02-27 18:27:14.f - M1 [LC:9] Internal event
+2025-02-27 18:27:14.f - M1 [LC:10] Received message. Queue length: 0
+2025-02-27 18:27:14.f - M1 [LC:11] Internal event
+2025-02-27 18:27:15.f - M1 [LC:12] Internal event
+2025-02-27 18:27:15.f - M1 [LC:13] Sent message to VM 2
+2025-02-27 18:27:15.f - M1 [LC:14] Internal event
+2025-02-27 18:27:15.f - M1 [LC:15] Sent messages to all VMs
+2025-02-27 18:27:16.f - M1 [LC:16] Internal event
+2025-02-27 18:27:16.f - M1 [LC:17] Internal event
+2025-02-27 18:27:16.f - M1 [LC:18] Internal event
+2025-02-27 18:27:16.f - M1 [LC:19] Sent message to VM 0
+2025-02-27 18:27:17.f - M1 [LC:21] Received message. Queue length: 0
+2025-02-27 18:27:17.f - M1 [LC:22] Sent message to VM 0
+2025-02-27 18:27:17.f - M1 [LC:23] Internal event
+2025-02-27 18:27:17.f - M1 [LC:24] Sent messages to all VMs
+2025-02-27 18:27:18.f - M1 [LC:25] Received message. Queue length: 0
+2025-02-27 18:27:18.f - M1 [LC:26] Internal event
+2025-02-27 18:27:18.f - M1 [LC:27] Internal event
+2025-02-27 18:27:18.f - M1 [LC:29] Received message. Queue length: 0
+2025-02-27 18:27:19.f - M1 [LC:30] Received message. Queue length: 0
+2025-02-27 18:27:19.f - M1 [LC:31] Internal event
+2025-02-27 18:27:19.f - M1 [LC:32] Received message. Queue length: 0
+2025-02-27 18:27:19.f - M1 [LC:33] Internal event
+2025-02-27 18:27:20.f - M1 [LC:34] Received message. Queue length: 0
+2025-02-27 18:27:20.f - M1 [LC:36] Received message. Queue length: 0
+2025-02-27 18:27:20.f - M1 [LC:37] Internal event
+2025-02-27 18:27:21.f - M1 [LC:38] Internal event
+2025-02-27 18:27:21.f - M1 [LC:39] Received message. Queue length: 0
+2025-02-27 18:27:21.f - M1 [LC:40] Internal event
+2025-02-27 18:27:21.f - M1 [LC:41] Sent message to VM 0
+2025-02-27 18:27:22.f - M1 [LC:42] Internal event
+2025-02-27 18:27:22.f - M1 [LC:43] Internal event
+2025-02-27 18:27:22.f - M1 [LC:45] Received message. Queue length: 0
+2025-02-27 18:27:22.f - M1 [LC:46] Received message. Queue length: 0
+2025-02-27 18:27:23.f - M1 [LC:47] Internal event
+2025-02-27 18:27:23.f - M1 [LC:48] Sent messages to all VMs
+2025-02-27 18:27:23.f - M1 [LC:49] Internal event
+2025-02-27 18:27:23.f - M1 [LC:50] Internal event
+2025-02-27 18:27:24.f - M1 [LC:51] Internal event
+2025-02-27 18:27:24.f - M1 [LC:52] Internal event
+2025-02-27 18:27:24.f - M1 [LC:54] Received message. Queue length: 0
+2025-02-27 18:27:24.f - M1 [LC:55] Internal event
+2025-02-27 18:27:25.f - M1 [LC:56] Sent messages to all VMs
+2025-02-27 18:27:25.f - M1 [LC:57] Internal event
+2025-02-27 18:27:25.f - M1 [LC:58] Internal event
+2025-02-27 18:27:25.f - M1 [LC:60] Received message. Queue length: 0
+2025-02-27 18:27:26.f - M1 [LC:61] Sent message to VM 0
+2025-02-27 18:27:26.f - M1 [LC:62] Internal event
+2025-02-27 18:27:26.f - M1 [LC:63] Internal event
+2025-02-27 18:27:26.f - M1 [LC:64] Internal event
+2025-02-27 18:27:27.f - M1 [LC:65] Internal event
+2025-02-27 18:27:27.f - M1 [LC:66] Internal event
+2025-02-27 18:27:27.f - M1 [LC:67] Internal event
+2025-02-27 18:27:27.f - M1 [LC:69] Received message. Queue length: 0
+2025-02-27 18:27:28.f - M1 [LC:70] Internal event
+2025-02-27 18:27:28.f - M1 [LC:71] Internal event
+2025-02-27 18:27:28.f - M1 [LC:72] Sent message to VM 2
+2025-02-27 18:27:28.f - M1 [LC:73] Sent message to VM 2
+2025-02-27 18:27:29.f - M1 [LC:74] Internal event
+2025-02-27 18:27:29.f - M1 [LC:76] Received message. Queue length: 0
+2025-02-27 18:27:29.f - M1 [LC:77] Internal event
+2025-02-27 18:27:29.f - M1 [LC:79] Received message. Queue length: 0
+2025-02-27 18:27:30.f - M1 [LC:80] Received message. Queue length: 0
+2025-02-27 18:27:30.f - M1 [LC:81] Received message. Queue length: 0
+2025-02-27 18:27:30.f - M1 [LC:82] Received message. Queue length: 0
+2025-02-27 18:27:30.f - M1 [LC:83] Internal event
+2025-02-27 18:27:31.f - M1 [LC:84] Internal event
+2025-02-27 18:27:31.f - M1 [LC:85] Received message. Queue length: 0
+2025-02-27 18:27:31.f - M1 [LC:86] Internal event
+2025-02-27 18:27:31.f - M1 [LC:88] Received message. Queue length: 0
+2025-02-27 18:27:32.f - M1 [LC:89] Received message. Queue length: 0
+2025-02-27 18:27:32.f - M1 [LC:90] Sent message to VM 2
+2025-02-27 18:27:32.f - M1 [LC:91] Sent message to VM 2
+2025-02-27 18:27:32.f - M1 [LC:92] Received message. Queue length: 0
+2025-02-27 18:27:33.f - M1 [LC:93] Received message. Queue length: 0
+2025-02-27 18:27:33.f - M1 [LC:94] Internal event
+2025-02-27 18:27:33.f - M1 [LC:96] Received message. Queue length: 0
+2025-02-27 18:27:33.f - M1 [LC:97] Received message. Queue length: 0
+2025-02-27 18:27:34.f - M1 [LC:98] Internal event
+2025-02-27 18:27:34.f - M1 [LC:99] Received message. Queue length: 0
+2025-02-27 18:27:34.f - M1 [LC:100] Internal event
+2025-02-27 18:27:34.f - M1 [LC:101] Internal event
+2025-02-27 18:27:35.f - M1 [LC:102] Sent message to VM 2
+2025-02-27 18:27:35.f - M1 [LC:103] Sent message to VM 2
+2025-02-27 18:27:35.f - M1 [LC:104] Internal event
+2025-02-27 18:27:35.f - M1 [LC:106] Received message. Queue length: 0
+2025-02-27 18:27:36.f - M1 [LC:107] Sent messages to all VMs
+2025-02-27 18:27:36.f - M1 [LC:108] Internal event
+2025-02-27 18:27:36.f - M1 [LC:110] Received message. Queue length: 0
+2025-02-27 18:27:36.f - M1 [LC:111] Internal event
+2025-02-27 18:27:37.f - M1 [LC:112] Internal event
+2025-02-27 18:27:37.f - M1 [LC:113] Internal event
+2025-02-27 18:27:37.f - M1 [LC:114] Received message. Queue length: 0
+2025-02-27 18:27:38.f - M1 [LC:115] Internal event
+2025-02-27 18:27:38.f - M1 [LC:116] Sent message to VM 0
+2025-02-27 18:27:38.f - M1 [LC:117] Sent message to VM 2
+2025-02-27 18:27:38.f - M1 [LC:118] Internal event
+2025-02-27 18:27:39.f - M1 [LC:119] Internal event
+2025-02-27 18:27:39.f - M1 [LC:120] Internal event
+2025-02-27 18:27:39.f - M1 [LC:122] Received message. Queue length: 0
+2025-02-27 18:27:39.f - M1 [LC:123] Sent message to VM 0
+2025-02-27 18:27:40.f - M1 [LC:126] Received message. Queue length: 0
+2025-02-27 18:27:40.f - M1 [LC:127] Internal event
+2025-02-27 18:27:40.f - M1 [LC:128] Sent message to VM 2
+2025-02-27 18:27:40.f - M1 [LC:129] Internal event
+2025-02-27 18:27:41.f - M1 [LC:130] Received message. Queue length: 0
+2025-02-27 18:27:41.f - M1 [LC:131] Received message. Queue length: 0
+2025-02-27 18:27:41.f - M1 [LC:132] Sent messages to all VMs
+2025-02-27 18:27:41.f - M1 [LC:133] Internal event
+2025-02-27 18:27:42.f - M1 [LC:134] Sent message to VM 2
+2025-02-27 18:27:42.f - M1 [LC:135] Internal event
+2025-02-27 18:27:42.f - M1 [LC:136] Internal event
+2025-02-27 18:27:42.f - M1 [LC:138] Received message. Queue length: 0
+2025-02-27 18:27:43.f - M1 [LC:139] Sent message to VM 0
+2025-02-27 18:27:43.f - M1 [LC:140] Internal event
+2025-02-27 18:27:43.f - M1 [LC:142] Received message. Queue length: 0
+2025-02-27 18:27:43.f - M1 [LC:143] Sent message to VM 0
+2025-02-27 18:27:44.f - M1 [LC:144] Internal event
+2025-02-27 18:27:44.f - M1 [LC:145] Internal event
+2025-02-27 18:27:44.f - M1 [LC:146] Internal event
+2025-02-27 18:27:44.f - M1 [LC:147] Internal event
+2025-02-27 18:27:45.f - M1 [LC:148] Internal event
+2025-02-27 18:27:45.f - M1 [LC:150] Received message. Queue length: 1
+2025-02-27 18:27:45.f - M1 [LC:151] Received message. Queue length: 0
+2025-02-27 18:27:45.f - M1 [LC:152] Internal event
+2025-02-27 18:27:46.f - M1 [LC:153] Received message. Queue length: 0
+2025-02-27 18:27:46.f - M1 [LC:154] Received message. Queue length: 0
+2025-02-27 18:27:46.f - M1 [LC:155] Internal event
+2025-02-27 18:27:46.f - M1 [LC:156] Internal event
+2025-02-27 18:27:47.f - M1 [LC:157] Received message. Queue length: 0
+2025-02-27 18:27:47.f - M1 [LC:158] Internal event
+2025-02-27 18:27:47.f - M1 [LC:159] Sent message to VM 2
+2025-02-27 18:27:47.f - M1 [LC:160] Internal event
+2025-02-27 18:27:48.f - M1 [LC:161] Sent message to VM 2
+2025-02-27 18:27:48.f - M1 [LC:162] Internal event
+2025-02-27 18:27:48.f - M1 [LC:164] Received message. Queue length: 0
+2025-02-27 18:27:48.f - M1 [LC:165] Internal event
+2025-02-27 18:27:49.f - M1 [LC:166] Received message. Queue length: 0
+2025-02-27 18:27:49.f - M1 [LC:167] Sent message to VM 2
+2025-02-27 18:27:49.f - M1 [LC:168] Internal event
+2025-02-27 18:27:49.f - M1 [LC:169] Internal event
+2025-02-27 18:27:50.f - M1 [LC:170] Internal event
+2025-02-27 18:27:50.f - M1 [LC:171] Internal event
+2025-02-27 18:27:50.f - M1 [LC:172] Internal event
+2025-02-27 18:27:50.f - M1 [LC:173] Sent message to VM 2
+2025-02-27 18:27:51.f - M1 [LC:174] Internal event
+2025-02-27 18:27:51.f - M1 [LC:175] Internal event
+2025-02-27 18:27:51.f - M1 [LC:176] Internal event
+2025-02-27 18:27:51.f - M1 [LC:177] Internal event
+2025-02-27 18:27:52.f - M1 [LC:178] Internal event
+2025-02-27 18:27:52.f - M1 [LC:181] Received message. Queue length: 0
+2025-02-27 18:27:52.f - M1 [LC:182] Internal event
+2025-02-27 18:27:52.f - M1 [LC:183] Received message. Queue length: 0
+2025-02-27 18:27:53.f - M1 [LC:184] Sent message to VM 0
+2025-02-27 18:27:53.f - M1 [LC:185] Internal event
+2025-02-27 18:27:53.f - M1 [LC:186] Internal event
+2025-02-27 18:27:54.f - M1 [LC:187] Internal event
+2025-02-27 18:27:54.f - M1 [LC:190] Received message. Queue length: 0
+2025-02-27 18:27:54.f - M1 [LC:191] Received message. Queue length: 0
+2025-02-27 18:27:54.f - M1 [LC:192] Internal event
+2025-02-27 18:27:55.f - M1 [LC:193] Internal event
+2025-02-27 18:27:55.f - M1 [LC:194] Internal event
+2025-02-27 18:27:55.f - M1 [LC:195] Sent messages to all VMs
+2025-02-27 18:27:55.f - M1 [LC:196] Internal event
+2025-02-27 18:27:56.f - M1 [LC:198] Received message. Queue length: 0
+2025-02-27 18:27:56.f - M1 [LC:199] Sent messages to all VMs
+2025-02-27 18:27:56.f - M1 [LC:200] Internal event
+2025-02-27 18:27:56.f - M1 [LC:201] Internal event
+2025-02-27 18:27:57.f - M1 [LC:202] Internal event
+2025-02-27 18:27:57.f - M1 [LC:203] Internal event
+2025-02-27 18:27:57.f - M1 [LC:204] Internal event
+2025-02-27 18:27:57.f - M1 [LC:205] Internal event
+2025-02-27 18:27:58.f - M1 [LC:206] Internal event
+2025-02-27 18:27:58.f - M1 [LC:209] Received message. Queue length: 0
+2025-02-27 18:27:58.f - M1 [LC:210] Sent message to VM 2
+2025-02-27 18:27:58.f - M1 [LC:211] Internal event
+2025-02-27 18:27:59.f - M1 [LC:212] Internal event
+2025-02-27 18:27:59.f - M1 [LC:213] Internal event
+2025-02-27 18:27:59.f - M1 [LC:214] Received message. Queue length: 0
+2025-02-27 18:27:59.f - M1 [LC:216] Received message. Queue length: 0
+2025-02-27 18:28:00.f - M1 [LC:217] Received message. Queue length: 0
+2025-02-27 18:28:00.f - M1 [LC:218] Sent messages to all VMs
+2025-02-27 18:28:00.f - M1 [LC:219] Internal event
+2025-02-27 18:28:00.f - M1 [LC:220] Sent message to VM 0
+2025-02-27 18:28:01.f - M1 [LC:222] Received message. Queue length: 0
+2025-02-27 18:28:01.f - M1 [LC:223] Internal event
+2025-02-27 18:28:01.f - M1 [LC:224] Internal event
+2025-02-27 18:28:01.f - M1 [LC:225] Received message. Queue length: 0
+2025-02-27 18:28:02.f - M1 [LC:226] Received message. Queue length: 0
+2025-02-27 18:28:02.f - M1 [LC:227] Internal event
+2025-02-27 18:28:02.f - M1 [LC:228] Internal event
+2025-02-27 18:28:02.f - M1 [LC:229] Received message. Queue length: 1
+2025-02-27 18:28:03.f - M1 [LC:230] Received message. Queue length: 0
+2025-02-27 18:28:03.f - M1 [LC:231] Internal event
+2025-02-27 18:28:03.f - M1 [LC:232] Internal event
+2025-02-27 18:28:03.f - M1 [LC:234] Received message. Queue length: 0
+2025-02-27 18:28:04.f - M1 [LC:235] Sent messages to all VMs
+2025-02-27 18:28:04.f - M1 [LC:236] Received message. Queue length: 0
+2025-02-27 18:28:04.f - M1 [LC:237] Sent messages to all VMs
+2025-02-27 18:28:04.f - M1 [LC:238] Internal event
+2025-02-27 18:28:05.f - M1 [LC:239] Internal event
+2025-02-27 18:28:05.f - M1 [LC:241] Received message. Queue length: 0
+2025-02-27 18:28:05.f - M1 [LC:242] Sent message to VM 0
+2025-02-27 18:28:05.f - M1 [LC:243] Internal event
+2025-02-27 18:28:06.f - M1 [LC:245] Received message. Queue length: 0
+2025-02-27 18:28:06.f - M1 [LC:246] Sent message to VM 0
+2025-02-27 18:28:06.f - M1 [LC:247] Sent message to VM 2
+2025-02-27 18:28:06.f - M1 [LC:248] Sent message to VM 2
+2025-02-27 18:28:07.f - M1 [LC:249] Sent message to VM 0
+2025-02-27 18:28:07.f - M1 [LC:250] Internal event
+2025-02-27 18:28:07.f - M1 [LC:251] Sent message to VM 0
+2025-02-27 18:28:07.f - M1 [LC:252] Internal event
+2025-02-27 18:28:08.f - M1 [LC:253] Internal event
+2025-02-27 18:28:08.f - M1 [LC:254] Internal event
+2025-02-27 18:28:08.f - M1 [LC:257] Received message. Queue length: 0
+2025-02-27 18:28:08.f - M1 [LC:258] Internal event
+2025-02-27 18:28:09.f - M1 [LC:259] Received message. Queue length: 0
+2025-02-27 18:28:09.f - M1 [LC:260] Internal event
+2025-02-27 18:28:09.f - M1 [LC:261] Internal event
+2025-02-27 18:28:10.f - M1 [LC:262] Sent message to VM 0
+2025-02-27 18:28:10.f - M1 [LC:263] Internal event
+2025-02-27 18:28:10.f - M1 [LC:264] Sent message to VM 2
+2025-02-27 18:28:10.f - M1 [LC:265] Sent message to VM 0
+2025-02-27 18:28:11.f - M1 [LC:266] Internal event
+2025-02-27 18:28:11.f - M1 [LC:267] Sent messages to all VMs
+2025-02-27 18:28:11.f - M1 [LC:268] Internal event
+2025-02-27 18:28:11.f - M1 [LC:269] Internal event
+2025-02-27 18:28:12.f - M1 [LC:270] Internal event
+2025-02-27 18:28:12.f - M1 [LC:271] Internal event
+2025-02-27 18:28:12.f - M1 [LC:272] Internal event
+2025-02-27 18:28:12.f - M1 [LC:275] Received message. Queue length: 0
+2025-02-27 18:28:13.f - M1 [LC:276] Sent message to VM 2
+2025-02-27 18:28:13.f - M1 [LC:277] Internal event
+2025-02-27 18:28:13.f - M1 [LC:278] Internal event
+2025-02-27 18:28:14.f - M1 [LC:278] Stopped VM 1

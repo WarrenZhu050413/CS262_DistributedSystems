@@ -26,19 +26,26 @@ class VirtualMachine:
         self.machine_id = machine_id
         self.port = port
         self.log_file = log_file
-        
+        # Remove existing log file if it exists
+        if os.path.exists(log_file):
+            os.remove(log_file)
+
         # Create log directory if it doesn't exist
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
-        
-        # Set up logging
-        logging.basicConfig(
-            filename=log_file,
-            level=logging.INFO,
-            format='%(asctime)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S.%f'
-        )
+        # Set up logging - FIXED to use a FileHandler for each VM
         self.logger = logging.getLogger(f"VM_{machine_id}")
+        self.logger.setLevel(logging.INFO)
         
+        # Remove existing handlers if any
+        if self.logger.handlers:
+            for handler in self.logger.handlers:
+                self.logger.removeHandler(handler)
+                
+        # Create file handler for this VM
+        file_handler = logging.FileHandler(log_file)
+        formatter = logging.Formatter('%(asctime)s - %(message)s', '%Y-%m-%d %H:%M:%S.%f')
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
         # Initialize logical clock
         self.logical_clock = 0
         
@@ -70,7 +77,7 @@ class VirtualMachine:
     def log(self, message):
         """Log a message with timestamp and logical clock value"""
         system_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-        self.logger.info(f"[LC:{self.logical_clock}] {message}")
+        self.logger.info(f"M{self.machine_id} [LC:{self.logical_clock}] {message}")
         
     def connect_to_peers(self, peers):
         """
@@ -90,7 +97,7 @@ class VirtualMachine:
         
         assert len(self.peer_sockets) == len(peers), "Failed to connect to all peers"
     
-    def listen_for_messages(self):
+    def network_queue_listens(self):
         """Listen for incoming messages on the server socket"""
         while self.running:
             try:
@@ -124,14 +131,14 @@ class VirtualMachine:
     
     def process_network_queue(self):
         """Move messages from network queue to message queue"""
-        while self.running:
-            if not self.network_queue.empty():
-                message = self.network_queue.get()
-                self.message_queue.put(message)
-            time.sleep(0.01)  # Small delay to prevent CPU hogging
-    
+        while not self.network_queue.empty():
+            message = self.network_queue.get()
+            self.message_queue.put(message)
+
     def run_clock_cycle(self):
         """Execute one clock cycle according to the VM's logic"""
+        # Process network queue
+        self.process_network_queue()
         # Process a message if available
         if not self.message_queue.empty():
             message = self.message_queue.get()
@@ -153,32 +160,22 @@ class VirtualMachine:
             self.logical_clock += 1
             
             if event_type == 1:
-                # Send to one random VM
-                if self.peer_sockets:
-                    random_peer_id = random.choice(list(self.peer_sockets.keys()))
-                    self.send_message(random_peer_id)
-                    self.log(f"Sent message to VM {random_peer_id}")
+                # Send to the first peer
+                peer_id = list(self.peer_sockets.keys())[0]
+                self.send_message(peer_id)
+                self.log(f"Sent message to VM {peer_id}")
             
             elif event_type == 2:
-                # Send to another random VM (different from the first if possible)
-                if len(self.peer_sockets) > 1:
-                    # Choose a different VM than in case 1 if possible
-                    peer_ids = list(self.peer_sockets.keys())
-                    random_peer_id = random.choice(peer_ids)
-                    self.send_message(random_peer_id)
-                    self.log(f"Sent message to VM {random_peer_id}")
-                elif self.peer_sockets:
-                    # If only one peer, send to that one
-                    random_peer_id = list(self.peer_sockets.keys())[0]
-                    self.send_message(random_peer_id)
-                    self.log(f"Sent message to VM {random_peer_id}")
+                # Send to the second peer
+                peer_id = list(self.peer_sockets.keys())[1]
+                self.send_message(peer_id)
+                self.log(f"Sent message to VM {peer_id}")
             
             elif event_type == 3:
                 # Send to all other VMs
                 for peer_id in self.peer_sockets:
                     self.send_message(peer_id)
                 self.log(f"Sent messages to all VMs")
-            
             else:
                 # Internal event
                 self.log("Internal event")
@@ -187,7 +184,7 @@ class VirtualMachine:
         """Send the current logical clock value to a peer VM"""
         try:
             message = str(self.logical_clock)
-            self.peer_sockets[peer_id].sendall(message.encode('utf-8'))
+            self.peer_sockets[peer_id].sendall(message.encode('utf-8')) # Sendall to ensure the message is sent
         except:
             self.log(f"Failed to send message to VM {peer_id}")
     
@@ -209,13 +206,7 @@ class VirtualMachine:
         self.running = True
         
         # Start the listener thread
-        listener_thread = threading.Thread(target=self.listen_for_messages)
-        listener_thread.daemon = True
-        listener_thread.start()
-        self.threads.append(listener_thread)
-        
-        # Start the network queue processor
-        network_processor = threading.Thread(target=self.process_network_queue)
+        network_processor = threading.Thread(target=self.network_queue_listens)
         network_processor.daemon = True
         network_processor.start()
         self.threads.append(network_processor)

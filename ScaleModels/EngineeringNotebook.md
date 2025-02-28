@@ -39,14 +39,6 @@ This notebook documents the design decisions and observations made during the im
    - The logical clock value
    - For receive events, the message queue length
 
-### Log Analysis
-
-I've implemented an analysis script (`analyze_logs.py`) that processes the log files and generates insights:
-
-1. **Parsing**: Extracts timestamp, logical clock values, event types, and queue lengths from log entries
-2. **Visualization**: Creates plots of logical clock values and queue lengths over time
-3. **Statistics**: Calculates queue length statistics and logical clock rates
-
 ## Implementation Challenges and Solutions
 
 1. **Socket Connection Handling**: 
@@ -60,6 +52,10 @@ I've implemented an analysis script (`analyze_logs.py`) that processes the log f
 3. **Logical Clock Implementation**:
    - Challenge: Correctly implementing the Lamport clock rules
    - Solution: Used the max(local, received) + 1 rule for message receipt and increment by 1 for other events
+
+4. **Logging Configuration**:
+   - Challenge: Each VM was writing logs to the same file
+   - Solution: Created separate file handlers for each VM's logger to ensure each VM writes to its own log file
 
 ## Unit Test Plan
 
@@ -107,6 +103,51 @@ Based on the README requirements, I've identified the following behaviors that s
 ### Shutdown Tests
 
 22. **VM Shutdown**: Verify that a VM can be properly shut down, closing all connections.
+
+## Log Analysis Framework
+
+I've implemented comprehensive log analysis tools to extract insights from the system runs:
+
+### Data Processing
+
+1. **Log Parsing**: The analysis begins by parsing the VM log files into structured data:
+   - Timestamps are converted to datetime objects
+   - Logical clock values are extracted
+   - Event types (send, receive, internal) are identified
+   - Queue lengths are recorded for receive events
+
+2. **DataFrame Creation**: All log data is loaded into pandas DataFrames for efficient analysis:
+   - Each VM's logs are combined into a single DataFrame
+   - Additional columns are calculated, such as time since start and logical clock jumps
+   - Data is saved to CSV files for future reference
+
+### Analysis Metrics
+
+The analysis system provides detailed insights into several key aspects:
+
+1. **Logical Clock Jumps Analysis**:
+   - Histograms of jump sizes (overall and by clock rate)
+   - Time series of jump values with error bars across runs
+   - Regression analysis of jump sums vs. clock rate (linear, quadratic, cubic models)
+
+2. **Logical Clock Drift Analysis**:
+   - Line graphs of each VM's logical clock values over time
+   - Sum of absolute differences between logical clocks
+   - Regression analysis of clock rate variance vs. logical clock variance
+
+3. **Queue Length Analysis**:
+   - Time series of queue lengths for each VM
+   - Analysis of consecutive logical clock differences
+   - Relationship between clock rates and queue buildup
+
+### Visualization Outputs
+
+The analysis system produces several types of visualizations:
+
+1. **Histograms**: Distribution of logical clock jumps
+2. **Line Graphs**: Time series of various metrics (logical clock values, queue lengths)
+3. **Scatter Plots with Regression Lines**: Relationships between variables
+4. **Error Bar Plots**: Variability across multiple runs
 
 ## Testing Plan
 

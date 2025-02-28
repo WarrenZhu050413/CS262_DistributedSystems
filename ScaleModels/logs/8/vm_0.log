@@ -1,0 +1,65 @@
+2025-02-27 18:38:20.f - M0 [LC:0] Initialized with clock rate 1 ticks/second
+2025-02-27 18:38:20.f - M0 [LC:0] Connected to VM 1 on port 10001
+2025-02-27 18:38:20.f - M0 [LC:0] Connected to VM 2 on port 10002
+2025-02-27 18:38:20.f - M0 [LC:1] Internal event
+2025-02-27 18:38:20.f - M0 [LC:1] Started VM 0 with clock rate 1
+2025-02-27 18:38:21.f - M0 [LC:3] Received message. Queue length: 1
+2025-02-27 18:38:22.f - M0 [LC:5] Received message. Queue length: 0
+2025-02-27 18:38:23.f - M0 [LC:14] Received message. Queue length: 1
+2025-02-27 18:38:24.f - M0 [LC:16] Received message. Queue length: 3
+2025-02-27 18:38:25.f - M0 [LC:18] Received message. Queue length: 3
+2025-02-27 18:38:26.f - M0 [LC:22] Received message. Queue length: 5
+2025-02-27 18:38:27.f - M0 [LC:23] Received message. Queue length: 6
+2025-02-27 18:38:28.f - M0 [LC:24] Received message. Queue length: 7
+2025-02-27 18:38:29.f - M0 [LC:30] Received message. Queue length: 7
+2025-02-27 18:38:30.f - M0 [LC:31] Received message. Queue length: 8
+2025-02-27 18:38:31.f - M0 [LC:33] Received message. Queue length: 8
+2025-02-27 18:38:32.f - M0 [LC:37] Received message. Queue length: 8
+2025-02-27 18:38:33.f - M0 [LC:38] Received message. Queue length: 7
+2025-02-27 18:38:34.f - M0 [LC:39] Received message. Queue length: 7
+2025-02-27 18:38:35.f - M0 [LC:40] Received message. Queue length: 7
+2025-02-27 18:38:36.f - M0 [LC:47] Received message. Queue length: 8
+2025-02-27 18:38:37.f - M0 [LC:50] Received message. Queue length: 8
+2025-02-27 18:38:38.f - M0 [LC:51] Received message. Queue length: 8
+2025-02-27 18:38:39.f - M0 [LC:57] Received message. Queue length: 7
+2025-02-27 18:38:40.f - M0 [LC:64] Received message. Queue length: 8
+2025-02-27 18:38:41.f - M0 [LC:70] Received message. Queue length: 7
+2025-02-27 18:38:42.f - M0 [LC:76] Received message. Queue length: 6
+2025-02-27 18:38:43.f - M0 [LC:80] Received message. Queue length: 6
+2025-02-27 18:38:44.f - M0 [LC:81] Received message. Queue length: 10
+2025-02-27 18:38:46.f - M0 [LC:87] Received message. Queue length: 13
+2025-02-27 18:38:47.f - M0 [LC:94] Received message. Queue length: 13
+2025-02-27 18:38:48.f - M0 [LC:100] Received message. Queue length: 14
+2025-02-27 18:38:49.f - M0 [LC:104] Received message. Queue length: 14
+2025-02-27 18:38:50.f - M0 [LC:118] Received message. Queue length: 14
+2025-02-27 18:38:51.f - M0 [LC:119] Received message. Queue length: 15
+2025-02-27 18:38:52.f - M0 [LC:120] Received message. Queue length: 17
+2025-02-27 18:38:53.f - M0 [LC:121] Received message. Queue length: 18
+2025-02-27 18:38:54.f - M0 [LC:122] Received message. Queue length: 18
+2025-02-27 18:38:55.f - M0 [LC:123] Received message. Queue length: 18
+2025-02-27 18:38:56.f - M0 [LC:124] Received message. Queue length: 18
+2025-02-27 18:38:57.f - M0 [LC:125] Received message. Queue length: 18
+2025-02-27 18:38:58.f - M0 [LC:126] Received message. Queue length: 18
+2025-02-27 18:38:59.f - M0 [LC:129] Received message. Queue length: 18
+2025-02-27 18:39:00.f - M0 [LC:132] Received message. Queue length: 19
+2025-02-27 18:39:01.f - M0 [LC:135] Received message. Queue length: 19
+2025-02-27 18:39:02.f - M0 [LC:136] Received message. Queue length: 18
+2025-02-27 18:39:03.f - M0 [LC:143] Received message. Queue length: 18
+2025-02-27 18:39:04.f - M0 [LC:145] Received message. Queue length: 18
+2025-02-27 18:39:05.f - M0 [LC:149] Received message. Queue length: 19
+2025-02-27 18:39:06.f - M0 [LC:150] Received message. Queue length: 22
+2025-02-27 18:39:07.f - M0 [LC:155] Received message. Queue length: 22
+2025-02-27 18:39:08.f - M0 [LC:157] Received message. Queue length: 23
+2025-02-27 18:39:09.f - M0 [LC:158] Received message. Queue length: 23
+2025-02-27 18:39:10.f - M0 [LC:159] Received message. Queue length: 23
+2025-02-27 18:39:11.f - M0 [LC:162] Received message. Queue length: 22
+2025-02-27 18:39:12.f - M0 [LC:169] Received message. Queue length: 22
+2025-02-27 18:39:13.f - M0 [LC:171] Received message. Queue length: 23
+2025-02-27 18:39:14.f - M0 [LC:176] Received message. Queue length: 23
+2025-02-27 18:39:15.f - M0 [LC:181] Received message. Queue length: 24
+2025-02-27 18:39:16.f - M0 [LC:188] Received message. Queue length: 25
+2025-02-27 18:39:17.f - M0 [LC:193] Received message. Queue length: 24
+2025-02-27 18:39:18.f - M0 [LC:194] Received message. Queue length: 26
+2025-02-27 18:39:19.f - M0 [LC:199] Received message. Queue length: 25
+2025-02-27 18:39:20.f - M0 [LC:201] Received message. Queue length: 25
+2025-02-27 18:39:22.f - M0 [LC:201] Stopped VM 0
